@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuthContext } from '@/context/AuthContext'
 import { Mail, ArrowRight, CheckCircle } from 'lucide-react'
@@ -6,10 +6,13 @@ import { Mail, ArrowRight, CheckCircle } from 'lucide-react'
 export function AuthPage() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [code, setCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { signInWithEmail, user } = useAuthContext()
+  const { signInWithEmail, verifyOtp, user } = useAuthContext()
   const navigate = useNavigate()
+  const codeInputRef = useRef<HTMLInputElement>(null)
 
   // If already authenticated, redirect to home
   useEffect(() => {
@@ -27,10 +30,27 @@ export function AuthPage() {
     try {
       await signInWithEmail(email.trim())
       setSent(true)
+      setTimeout(() => codeInputRef.current?.focus(), 100)
     } catch (err: any) {
       setError(err.message || 'Failed to send magic link')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!code.trim() || code.length < 6) return
+
+    setVerifying(true)
+    setError(null)
+    try {
+      await verifyOtp(email.trim(), code.trim())
+      // onAuthStateChange will pick up the session and redirect
+    } catch (err: any) {
+      setError(err.message || 'Invalid code, please try again')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -52,19 +72,53 @@ export function AuthPage() {
         </div>
 
         {sent ? (
-          /* Success state */
-          <div className="bg-[var(--bg-elevated)] rounded-2xl p-8 text-center">
+          /* OTP code entry */
+          <div className="bg-[var(--bg-elevated)] rounded-2xl p-8">
             <div className="flex justify-center mb-4">
-              <CheckCircle className="w-12 h-12 text-emerald-500" />
+              <CheckCircle className="w-10 h-10 text-emerald-500" />
             </div>
-            <h2 className="text-[var(--text)] font-semibold text-lg mb-2">Check your email</h2>
-            <p className="text-[var(--text-secondary)] text-sm mb-6">
-              We sent a magic link to <span className="text-[var(--text)] font-medium">{email}</span>.
-              Click the link to sign in.
+            <h2 className="text-[var(--text)] font-semibold text-lg mb-1 text-center">Check your email</h2>
+            <p className="text-[var(--text-secondary)] text-sm mb-6 text-center">
+              Enter the 6-digit code sent to <span className="text-[var(--text)] font-medium">{email}</span>
             </p>
+
+            <form onSubmit={handleVerify} className="space-y-4">
+              <input
+                ref={codeInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={code}
+                onChange={(e) => { setCode(e.target.value.replace(/\D/g, '')); setError(null) }}
+                placeholder="123456"
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-4 py-4 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-2xl tracking-widest text-center font-mono"
+                autoComplete="one-time-code"
+                required
+              />
+
+              {error && (
+                <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={verifying || code.length < 6}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-[var(--bg-deep)] disabled:text-[var(--text-muted)] text-[var(--text)] font-semibold py-3 rounded-xl transition-colors text-sm"
+              >
+                {verifying ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>Sign in <ArrowRight className="w-4 h-4" /></>
+                )}
+              </button>
+            </form>
+
             <button
-              onClick={() => { setSent(false); setEmail('') }}
-              className="text-blue-400 text-sm hover:text-blue-300 transition-colors"
+              onClick={() => { setSent(false); setCode(''); setError(null) }}
+              className="w-full text-center text-[var(--text-muted)] text-xs mt-4 hover:text-[var(--text-secondary)] transition-colors"
             >
               Use a different email
             </button>
