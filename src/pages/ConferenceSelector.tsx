@@ -219,7 +219,7 @@ export function ConferenceSelector() {
       <div className="px-5 pt-14 pb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--text)] tracking-tight">ConferenceHQ</h1>
+            <h1 className="text-3xl font-bold text-[var(--text)] tracking-tight">Conf Hunting</h1>
             <p className="text-[var(--text-secondary)] text-sm mt-1">Your networking war room</p>
           </div>
           <div className="flex items-center gap-2">
