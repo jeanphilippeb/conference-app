@@ -2,13 +2,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Conference } from '@/lib/types'
 
+// Module-level cache: persists across route changes so navigating back shows
+// data immediately instead of showing a loading skeleton.
+let conferencesCache: Conference[] | null = null
+
 export function useConferences() {
-  const [conferences, setConferences] = useState<Conference[]>([])
-  const [loading, setLoading] = useState(true)
+  const [conferences, setConferences] = useState<Conference[]>(conferencesCache ?? [])
+  const [loading, setLoading] = useState(conferencesCache === null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchConferences = useCallback(async () => {
-    setLoading(true)
+    // Only show skeleton on first load — if cache exists, refetch silently
+    if (conferencesCache === null) setLoading(true)
     setError(null)
     try {
       // 3 queries total (instead of 3 per conference)
@@ -45,6 +50,7 @@ export function useConferences() {
         return { ...conf, target_count: ids.length, met_count: metCount } as Conference
       })
 
+      conferencesCache = enriched
       setConferences(enriched)
     } catch (err: any) {
       setError(err.message || 'Failed to fetch conferences')
@@ -56,6 +62,8 @@ export function useConferences() {
   useEffect(() => {
     fetchConferences()
   }, [fetchConferences])
+
+  const invalidateCache = () => { conferencesCache = null }
 
   const createConference = async (data: {
     name: string
@@ -76,9 +84,10 @@ export function useConferences() {
       .single()
 
     if (error) throw error
+    conferencesCache = null
     await fetchConferences()
     return created as Conference
   }
 
-  return { conferences, loading, error, refetch: fetchConferences, createConference }
+  return { conferences, loading, error, refetch: fetchConferences, createConference, invalidateCache }
 }

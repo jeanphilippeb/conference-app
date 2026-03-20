@@ -1,5 +1,5 @@
-const CACHE_NAME = 'conf-hunter-v2'
-const DATA_CACHE = 'conf-hunter-data-v2'
+const CACHE_NAME = 'conf-hunter-v3'
+const DATA_CACHE = 'conf-hunter-data-v3'
 
 const APP_SHELL = ['/', '/index.html']
 
@@ -28,26 +28,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
 
-  // Supabase GET: stale-while-revalidate
-  // Serve cached data instantly, refresh in background
-  if (url.hostname.includes('supabase.co') && event.request.method === 'GET') {
-    event.respondWith(
-      caches.open(DATA_CACHE).then((cache) =>
-        cache.match(event.request).then((cached) => {
-          const networkFetch = fetch(event.request)
-            .then((response) => {
-              if (response.ok) cache.put(event.request, response.clone())
-              return response
-            })
-            .catch(() => cached)
-          return cached || networkFetch
-        })
-      )
-    )
-    return
-  }
-
-  // Supabase writes: network only
+  // Supabase: always network-only (React-level cache handles instant back-nav)
   if (url.hostname.includes('supabase.co')) {
     return
   }
