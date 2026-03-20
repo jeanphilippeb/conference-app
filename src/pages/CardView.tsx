@@ -95,6 +95,7 @@ export function CardView() {
   const [floatingPts, setFloatingPts] = useState<number | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevNoteRef = useRef('')
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const target: Target | undefined = targets.find(t => t.id === targetId)
 
@@ -161,6 +162,7 @@ export function CardView() {
           return newNote
         })
       })
+      noteTextareaRef.current?.focus()
     }
   }
 
@@ -368,6 +370,7 @@ export function CardView() {
             </div>
             <div className="relative">
               <textarea
+                ref={noteTextareaRef}
                 value={note}
                 onChange={(e) => handleNoteChange(e.target.value)}
                 placeholder="What did you talk about?"

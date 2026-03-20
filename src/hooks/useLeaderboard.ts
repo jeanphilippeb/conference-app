@@ -45,21 +45,36 @@ export function useLeaderboard(conferenceId: string | undefined) {
         return
       }
 
-      // Conference-specific: aggregate interactions
-      const { data, error } = await supabase
+      // Conference-specific: aggregate interactions (fetch profiles separately
+      // to avoid relying on an indirect FK join that Supabase may not resolve)
+      const { data: interactions, error: intError } = await supabase
         .from('conference_interactions')
         .select(`
           id,
           user_id,
           status,
           score,
-          conference_targets!inner(conference_id, priority),
-          conference_profiles!inner(id, name, avatar_url, lifetime_score)
+          conference_targets!inner(conference_id, priority)
         `)
         .eq('conference_targets.conference_id', conferenceId)
         .eq('status', 'met')
 
-      if (error) throw error
+      if (intError) throw intError
+
+      const rows = interactions || []
+      const userIds = [...new Set(rows.map(r => r.user_id))]
+
+      let profileMap: Record<string, { name: string; avatar_url?: string; lifetime_score: number }> = {}
+      if (userIds.length > 0) {
+        const { data: profiles, error: profError } = await supabase
+          .from('conference_profiles')
+          .select('id, name, avatar_url, lifetime_score')
+          .in('id', userIds)
+        if (profError) throw profError
+        for (const p of profiles || []) {
+          profileMap[p.id] = p
+        }
+      }
 
       const byUser: Record<string, {
         name: string
@@ -70,16 +85,16 @@ export function useLeaderboard(conferenceId: string | undefined) {
         mustMeetCount: number
       }> = {}
 
-      for (const row of data || []) {
-        const profile = row.conference_profiles as any
+      for (const row of rows) {
+        const profile = profileMap[row.user_id]
         const target = row.conference_targets as any
         const uid = row.user_id
 
         if (!byUser[uid]) {
           byUser[uid] = {
-            name: profile.name || 'Unknown',
-            avatarUrl: profile.avatar_url,
-            lifetimeScore: profile.lifetime_score || 0,
+            name: profile?.name || 'Unknown',
+            avatarUrl: profile?.avatar_url,
+            lifetimeScore: profile?.lifetime_score || 0,
             conferenceScore: 0,
             metCount: 0,
             mustMeetCount: 0,

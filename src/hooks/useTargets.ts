@@ -2,9 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Target, Interaction } from '@/lib/types'
 
+// Module-level cache: persists across route changes so navigating back shows
+// data immediately instead of showing a loading skeleton.
+const targetsCache = new Map<string, Target[]>()
+
 export function useTargets(conferenceId: string | undefined) {
-  const [targets, setTargets] = useState<Target[]>([])
-  const [loading, setLoading] = useState(true)
+  const cached = conferenceId ? targetsCache.get(conferenceId) : undefined
+  const [targets, setTargets] = useState<Target[]>(cached ?? [])
+  const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
 
   const fetchTargets = useCallback(async () => {
@@ -13,7 +18,8 @@ export function useTargets(conferenceId: string | undefined) {
       setLoading(false)
       return
     }
-    setLoading(true)
+    // Only show skeleton on first load — if cache exists, refetch silently
+    if (!targetsCache.has(conferenceId)) setLoading(true)
     setError(null)
     try {
       const { data: targetsData, error: targetsError } = await supabase
@@ -61,6 +67,7 @@ export function useTargets(conferenceId: string | undefined) {
         } as Target
       })
 
+      targetsCache.set(conferenceId, enriched)
       setTargets(enriched)
     } catch (err: any) {
       setError(err.message || 'Failed to fetch targets')

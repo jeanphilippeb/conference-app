@@ -141,27 +141,26 @@ function NewConferenceModal({ onClose, onCreate }: NewConferenceModalProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Start Date</label>
-              <input
-                type="date"
-                value={form.start_date}
-                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">End Date</label>
-              <input
-                type="date"
-                value={form.end_date}
-                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Start Date</label>
+            <input
+              type="date"
+              value={form.start_date}
+              onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">End Date</label>
+            <input
+              type="date"
+              value={form.end_date}
+              onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-3 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
+              required
+            />
           </div>
 
           {error && (

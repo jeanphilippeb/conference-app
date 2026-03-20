@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Save, Plus, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/context/AuthContext'
 import { Priority } from '@/lib/types'
@@ -46,6 +46,7 @@ export function AddTargetPage() {
 
   const [form, setForm] = useState<FormData>(DEFAULT_FORM)
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(!!targetId)
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -97,6 +98,19 @@ export function AddTargetPage() {
 
   const removeTag = (tag: string) => {
     setForm(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }))
+  }
+
+  const handleDelete = async () => {
+    if (!targetId || !window.confirm('Delete this target? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      const { error } = await supabase.from('conference_targets').delete().eq('id', targetId)
+      if (error) throw error
+      navigate(`/conference/${conferenceId}`, { replace: true })
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete target')
+      setDeleting(false)
+    }
   }
 
   const handleTagKeyDown = (e: React.KeyboardEvent) => {
@@ -382,20 +396,36 @@ export function AddTargetPage() {
 
       {/* Fixed save button */}
       <div className="fixed bottom-0 left-0 right-0 bg-[var(--bg)]/95 backdrop-blur-sm border-t border-[var(--border)] px-5 py-4 safe-bottom">
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !form.first_name || !form.last_name || !form.company}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-[var(--bg-deep)] disabled:text-[var(--text-muted)] text-[var(--text)] font-bold py-4 rounded-2xl transition-colors text-base"
-        >
-          {loading ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              <Save className="w-5 h-5" />
-              {isEdit ? 'Save Changes' : 'Add Target'}
-            </>
+        <div className="flex gap-3">
+          {isEdit && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="w-14 flex items-center justify-center rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-colors flex-shrink-0"
+            >
+              {deleting ? (
+                <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+              ) : (
+                <Trash2 className="w-5 h-5 text-red-400" />
+              )}
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !form.first_name || !form.last_name || !form.company}
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-[var(--bg-deep)] disabled:text-[var(--text-muted)] text-[var(--text)] font-bold py-4 rounded-2xl transition-colors text-base"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                {isEdit ? 'Save Changes' : 'Add Target'}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )
