@@ -219,7 +219,9 @@ export function GridView() {
     <div className="min-h-screen bg-[var(--bg)] pb-8">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-30 bg-[var(--bg)]/95 backdrop-blur-sm pt-12 pb-0">
-        <div className="flex items-center gap-2 px-4 pb-3">
+
+        {/* Row 1: back · name/stats · points · coverage */}
+        <div className="flex items-center gap-2 px-4 pb-2">
           <button
             onClick={() => navigate('/')}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0"
@@ -240,84 +242,50 @@ export function GridView() {
               )}
             </p>
           </div>
-
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => { setSearchOpen(!searchOpen); setSearchQuery('') }}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
-            >
-              {searchOpen ? <X className="w-4 h-4 text-[var(--text-secondary)]" /> : <Search className="w-4 h-4 text-[var(--text-secondary)]" />}
-            </button>
-            <GameHeaderButton />
-            <button
-              onClick={() => navigate(`/conference/${conferenceId}/coverage`)}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
-            >
-              <BarChart2 className="w-4 h-4 text-[var(--text-secondary)]" />
-            </button>
-            <ThemeToggle />
-            {/* List / Grid toggle pill */}
-            <div className="flex items-center rounded-xl overflow-hidden border border-[var(--border)]" style={{ background: 'var(--bg-elevated)' }}>
-              <button
-                onClick={() => navigate(`/conference/${conferenceId}`)}
-                className="flex items-center justify-center w-7 h-7 hover:bg-[var(--bg-deep)] transition-colors"
-              >
-                <List className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-              </button>
-              <button
-                disabled
-                className="flex items-center justify-center w-7 h-7 bg-blue-600"
-              >
-                <LayoutGrid className="w-3.5 h-3.5 text-white" />
-              </button>
-            </div>
-          </div>
+          <GameHeaderButton />
+          <button
+            onClick={() => navigate(`/conference/${conferenceId}/coverage`)}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0"
+          >
+            <BarChart2 className="w-4 h-4 text-[var(--text-secondary)]" />
+          </button>
         </div>
 
-        {/* Search input */}
-        {searchOpen && (
-          <div className="px-4 pb-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search name, company, role..."
-              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
-              autoFocus
-            />
-          </div>
-        )}
-
-        {/* Streak banner */}
-        <StreakBanner />
-
-        {/* Filter chips + sort */}
-        <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto">
-          {filters.map((f) => (
+        {/* Row 2: list/card toggle · theme · sort · search */}
+        <div className="flex items-center gap-2 px-4 pb-2">
+          {/* List / Grid toggle pill */}
+          <div className="flex items-center rounded-xl overflow-hidden border border-[var(--border)]" style={{ background: 'var(--bg-elevated)' }}>
             <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filter === f.key
-                  ? 'bg-blue-600 text-[var(--text)]'
-                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-deep)]'
-              }`}
+              onClick={() => navigate(`/conference/${conferenceId}`)}
+              className="flex items-center justify-center w-8 h-8 hover:bg-[var(--bg-deep)] transition-colors"
             >
-              {f.label}
+              <List className="w-4 h-4 text-[var(--text-secondary)]" />
             </button>
-          ))}
+            <button disabled className="flex items-center justify-center w-8 h-8 bg-blue-600">
+              <LayoutGrid className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          <ThemeToggle />
+          {/* Sort */}
           <button
             onClick={() => setShowSortMenu(!showSortMenu)}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-xs font-medium hover:bg-[var(--bg-deep)] transition-colors ml-auto"
+            className="flex items-center gap-1.5 px-3 h-8 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-xs font-medium hover:bg-[var(--bg-deep)] transition-colors border border-[var(--border)]"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             {sortLabels[sort]}
+          </button>
+          {/* Search */}
+          <button
+            onClick={() => { setSearchOpen(!searchOpen); setSearchQuery('') }}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors ml-auto"
+          >
+            {searchOpen ? <X className="w-4 h-4 text-[var(--text-secondary)]" /> : <Search className="w-4 h-4 text-[var(--text-secondary)]" />}
           </button>
         </div>
 
         {/* Sort dropdown */}
         {showSortMenu && (
-          <div className="absolute right-4 top-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl shadow-xl z-40 overflow-hidden">
+          <div className="absolute left-4 right-4 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl shadow-xl z-40 overflow-hidden">
             {(Object.entries(sortLabels) as [SortKey, string][]).map(([key, label]) => (
               <button
                 key={key}
@@ -333,6 +301,40 @@ export function GridView() {
             ))}
           </div>
         )}
+
+        {/* Search input */}
+        {searchOpen && (
+          <div className="px-4 pb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search name, company, role..."
+              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
+              autoFocus
+            />
+          </div>
+        )}
+
+        {/* Streak banner */}
+        <StreakBanner />
+
+        {/* Row 3: filter chips */}
+        <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto">
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filter === f.key
+                  ? 'bg-blue-600 text-[var(--text)]'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-deep)]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid */}
