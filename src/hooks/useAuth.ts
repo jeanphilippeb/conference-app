@@ -1,0 +1,75 @@
+import { useState, useEffect } from 'react'
+import { User } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+import { Profile } from '@/lib/types'
+
+export function useAuth() {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchProfile = async (userId: string, email: string) => {
+    try {
+      const { data } = await supabase
+        .from('conference_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (data) {
+        setProfile(data as Profile)
+      } else {
+        // Auto-create profile on first login
+        const name = email.split('@')[0].replace(/[._]/g, ' ')
+        const { data: newProfile } = await supabase
+          .from('conference_profiles')
+          .upsert({ id: userId, email, name, role: 'rep' })
+          .select()
+          .single()
+        if (newProfile) setProfile(newProfile as Profile)
+      }
+    } catch {
+      // Non-fatal — app works without profile
+    }
+  }
+
+  useEffect(() => {
+    // onAuthStateChange fires immediately with the current session (INITIAL_SESSION event)
+    // so we only need this one listener — no need for getSession()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          await fetchProfile(session.user.id, session.user.email || '')
+        } else {
+          setProfile(null)
+        }
+        setLoading(false)
+      }
+    )
+
+    // Safety timeout — if Supabase never responds, unblock after 3s
+    const timeout = setTimeout(() => setLoading(false), 3000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
+  }, [])
+
+  const signInWithEmail = async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/` },
+    })
+    if (error) throw error
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    setProfile(null)
+  }
+
+  return { user, profile, loading, signInWithEmail, signOut }
+}

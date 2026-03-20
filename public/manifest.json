@@ -1,0 +1,19 @@
+{
+  "name": "Conf Hunter",
+  "short_name": "Conf Hunter",
+  "description": "Your networking war room for conferences",
+  "theme_color": "#0F172A",
+  "background_color": "#0F172A",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}
