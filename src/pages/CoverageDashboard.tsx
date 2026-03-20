@@ -14,7 +14,7 @@ interface TargetWithInteractions extends Target {
     notes?: string
     met_at: string
     created_at: string
-    profile?: Profile | null
+    profile?: Profile
   }>
 }
 
