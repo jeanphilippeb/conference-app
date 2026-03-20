@@ -39,17 +39,12 @@ export function AuthPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-10">
-          {/* Minehub logo mark */}
+          {/* Minehub logo mark — icon only */}
           <div className="mb-4">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Bottom face */}
-              <polygon points="8,28 24,38 40,28 24,18" fill="#0a3d47" />
-              {/* Left face */}
-              <polygon points="8,16 8,28 24,38 24,26" fill="#0d5c6e" />
-              {/* Right face */}
-              <polygon points="40,16 40,28 24,38 24,26" fill="#0f7a94" />
-              {/* Top face */}
-              <polygon points="8,16 24,6 40,16 24,26" fill="#12a0c0" />
+            <svg width="56" height="48" viewBox="440 15 100 88" xmlns="http://www.w3.org/2000/svg">
+              <rect x="492.58" y="74.74" fill="#008C94" width="22.95" height="22.95"/>
+              <polygon fill="var(--text)" points="485.63,18.8 485.63,55.13 462.38,74.73 444.37,74.73 444.37,97.68 467.31,97.68 467.31,82.5 488.44,64.68 531.51,64.68 531.51,18.8"/>
+              <path fill="#005763" d="M473.36,53.48V32.64c0-0.75-0.61-1.35-1.35-1.35h-30.69c-0.75,0-1.35,0.61-1.35,1.35v30.69c0,0.75,0.61,1.35,1.35,1.35h18.76L473.36,53.48z"/>
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-[var(--text)] tracking-tight">Conf Hunting</h1>
