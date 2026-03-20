@@ -224,10 +224,10 @@ export function ListView() {
               <h1 className="text-[var(--text)] font-bold text-base truncate max-w-[160px]">
                 {conference?.name || '...'}
               </h1>
-              <p className="text-[var(--text-secondary)] text-xs">
+              <p className="text-[var(--text-secondary)] text-xs whitespace-nowrap">
                 {metCount}/{totalCount} met · {pct}%
                 {mustMeetTotal > 0 && mustMeetDone < mustMeetTotal && (
-                  <> · {mustMeetTotal - mustMeetDone} Must-Meet left 👑</>
+                  <> · {mustMeetTotal - mustMeetDone} left 👑</>
                 )}
                 {mustMeetTotal > 0 && mustMeetDone >= mustMeetTotal && (
                   <> · <span style={{ color: '#FBBF24' }}>Grand Slam 👑</span></>

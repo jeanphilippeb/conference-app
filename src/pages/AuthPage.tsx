@@ -39,18 +39,20 @@ export function AuthPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect x="4" y="8" width="24" height="18" rx="2" stroke="white" strokeWidth="2" />
-              <path d="M4 13h24" stroke="white" strokeWidth="2" />
-              <circle cx="10" cy="6" r="2" fill="white" />
-              <circle cx="22" cy="6" r="2" fill="white" />
-              <rect x="8" y="17" width="4" height="4" rx="1" fill="white" />
-              <rect x="14" y="17" width="4" height="4" rx="1" fill="white" />
-              <rect x="20" y="17" width="4" height="4" rx="1" fill="white" />
+          {/* Minehub logo mark */}
+          <div className="mb-4">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Bottom face */}
+              <polygon points="8,28 24,38 40,28 24,18" fill="#0a3d47" />
+              {/* Left face */}
+              <polygon points="8,16 8,28 24,38 24,26" fill="#0d5c6e" />
+              {/* Right face */}
+              <polygon points="40,16 40,28 24,38 24,26" fill="#0f7a94" />
+              {/* Top face */}
+              <polygon points="8,16 24,6 40,16 24,26" fill="#12a0c0" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-[var(--text)] tracking-tight">ConferenceHQ</h1>
+          <h1 className="text-3xl font-bold text-[var(--text)] tracking-tight">Conf Hunting</h1>
           <p className="text-[var(--text-secondary)] mt-2 text-sm">Your networking war room</p>
         </div>
 
@@ -118,7 +120,7 @@ export function AuthPage() {
         )}
 
         <p className="text-center text-[var(--text-muted)] text-xs mt-8">
-          ConferenceHQ · Networking made simple
+          Conf Hunting · Networking made simple
         </p>
       </div>
     </div>
