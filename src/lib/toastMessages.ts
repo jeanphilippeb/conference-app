@@ -44,7 +44,7 @@ export const TOAST_MESSAGES = {
     '💼 That\'s how pipelines are built.',
   ],
   app_open: [
-    '☕ Coffee + ConferenceHQ = deals.',
+    '☕ Coffee + Conf Hunting = deals.',
     '🌅 New day, new contacts. Let\'s go.',
     '👔 You\'re going to crush this day.',
     '🎪 The floor is yours. Go get \'em.',
