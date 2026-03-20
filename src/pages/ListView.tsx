@@ -212,57 +212,52 @@ export function ListView() {
     <div className="min-h-screen bg-[var(--bg)] pb-6">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-[var(--bg)]/95 backdrop-blur-sm pt-12 pb-0">
-        <div className="flex items-center justify-between px-4 pb-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/')}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 text-[var(--text-secondary)]" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-[var(--text)] font-bold text-base truncate max-w-[160px]">
-                {conference?.name || '...'}
-              </h1>
-              <p className="text-[var(--text-secondary)] text-xs whitespace-nowrap">
-                {metCount}/{totalCount} met · {pct}%
-                {mustMeetTotal > 0 && mustMeetDone < mustMeetTotal && (
-                  <> · {mustMeetTotal - mustMeetDone} left 👑</>
-                )}
-                {mustMeetTotal > 0 && mustMeetDone >= mustMeetTotal && (
-                  <> · <span style={{ color: '#FBBF24' }}>Grand Slam 👑</span></>
-                )}
-              </p>
-            </div>
+        <div className="flex items-center gap-2 px-4 pb-3">
+          <button
+            onClick={() => navigate('/')}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-[var(--text-secondary)]" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[var(--text)] font-bold text-base truncate">
+              {conference?.name || '...'}
+            </h1>
+            <p className="text-[var(--text-secondary)] text-xs whitespace-nowrap">
+              {metCount}/{totalCount} met · {pct}%
+              {mustMeetTotal > 0 && mustMeetDone < mustMeetTotal && (
+                <> · {mustMeetTotal - mustMeetDone} left 👑</>
+              )}
+              {mustMeetTotal > 0 && mustMeetDone >= mustMeetTotal && (
+                <> · <span style={{ color: '#FBBF24' }}>Grand Slam 👑</span></>
+              )}
+            </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => { setSearchOpen(!searchOpen); setSearchQuery('') }}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
             >
               {searchOpen ? <X className="w-4 h-4 text-[var(--text-secondary)]" /> : <Search className="w-4 h-4 text-[var(--text-secondary)]" />}
             </button>
             <GameHeaderButton />
             <button
               onClick={() => navigate(`/conference/${conferenceId}/coverage`)}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
             >
               <BarChart2 className="w-4 h-4 text-[var(--text-secondary)]" />
             </button>
             <ThemeToggle />
             {/* List / Grid toggle pill */}
             <div className="flex items-center rounded-xl overflow-hidden border border-[var(--border)]" style={{ background: 'var(--bg-elevated)' }}>
-              <button
-                disabled
-                className="flex items-center justify-center w-8 h-8 bg-blue-600"
-              >
-                <List className="w-4 h-4 text-white" />
+              <button disabled className="flex items-center justify-center w-7 h-7 bg-blue-600">
+                <List className="w-3.5 h-3.5 text-white" />
               </button>
               <button
                 onClick={() => navigate(`/conference/${conferenceId}/grid`)}
-                className="flex items-center justify-center w-8 h-8 hover:bg-[var(--bg-deep)] transition-colors"
+                className="flex items-center justify-center w-7 h-7 hover:bg-[var(--bg-deep)] transition-colors"
               >
-                <LayoutGrid className="w-4 h-4 text-[var(--text-secondary)]" />
+                <LayoutGrid className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
               </button>
             </div>
           </div>
