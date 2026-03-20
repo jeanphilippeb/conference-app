@@ -8,6 +8,7 @@ interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   signInWithEmail: (email: string) => Promise<void>
+  verifyOtp: (email: string, token: string) => Promise<void>
   signOut: () => Promise<void>
 }
 

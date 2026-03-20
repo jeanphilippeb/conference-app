@@ -60,7 +60,16 @@ export function useAuth() {
   const signInWithEmail = async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/` },
+      options: { shouldCreateUser: true },
+    })
+    if (error) throw error
+  }
+
+  const verifyOtp = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
     })
     if (error) throw error
   }
@@ -71,5 +80,5 @@ export function useAuth() {
     setProfile(null)
   }
 
-  return { user, profile, loading, signInWithEmail, signOut }
+  return { user, profile, loading, signInWithEmail, verifyOtp, signOut }
 }
