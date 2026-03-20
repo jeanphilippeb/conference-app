@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
@@ -7,22 +8,31 @@ import { FunToastContainer } from './components/FunToast'
 import { LevelUpOverlay } from './components/LevelUpOverlay'
 import { GrandSlamOverlay } from './components/GrandSlamOverlay'
 import { GameSheet } from './components/GameSheet'
-import { AuthPage } from './pages/AuthPage'
-import { ConferenceSelector } from './pages/ConferenceSelector'
-import { GridView } from './pages/GridView'
-import { CardView } from './pages/CardView'
-import { ListView } from './pages/ListView'
-import { AddTargetPage } from './pages/AddTargetPage'
-import { CoverageDashboard } from './pages/CoverageDashboard'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
+const AuthPage = lazy(() => import('./pages/AuthPage').then(m => ({ default: m.AuthPage })))
+const ConferenceSelector = lazy(() => import('./pages/ConferenceSelector').then(m => ({ default: m.ConferenceSelector })))
+const GridView = lazy(() => import('./pages/GridView').then(m => ({ default: m.GridView })))
+const ListView = lazy(() => import('./pages/ListView').then(m => ({ default: m.ListView })))
+const CardView = lazy(() => import('./pages/CardView').then(m => ({ default: m.CardView })))
+const AddTargetPage = lazy(() => import('./pages/AddTargetPage').then(m => ({ default: m.AddTargetPage })))
+const CoverageDashboard = lazy(() => import('./pages/CoverageDashboard').then(m => ({ default: m.CoverageDashboard })))
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+    </div>
+  )
+}
+
 const router = createBrowserRouter([
-  { path: '/auth', element: <AuthPage /> },
+  { path: '/auth', element: <Suspense fallback={<PageLoader />}><AuthPage /></Suspense> },
   {
     path: '/',
     element: (
       <ProtectedRoute>
-        <ConferenceSelector />
+        <Suspense fallback={<PageLoader />}><ConferenceSelector /></Suspense>
       </ProtectedRoute>
     ),
   },
@@ -30,7 +40,7 @@ const router = createBrowserRouter([
     path: '/conference/:conferenceId',
     element: (
       <ProtectedRoute>
-        <ListView />
+        <Suspense fallback={<PageLoader />}><ListView /></Suspense>
       </ProtectedRoute>
     ),
   },
@@ -38,7 +48,7 @@ const router = createBrowserRouter([
     path: '/conference/:conferenceId/grid',
     element: (
       <ProtectedRoute>
-        <GridView />
+        <Suspense fallback={<PageLoader />}><GridView /></Suspense>
       </ProtectedRoute>
     ),
   },
@@ -46,7 +56,7 @@ const router = createBrowserRouter([
     path: '/conference/:conferenceId/target/:targetId',
     element: (
       <ProtectedRoute>
-        <CardView />
+        <Suspense fallback={<PageLoader />}><CardView /></Suspense>
       </ProtectedRoute>
     ),
   },
@@ -54,7 +64,7 @@ const router = createBrowserRouter([
     path: '/conference/:conferenceId/target/:targetId/edit',
     element: (
       <ProtectedRoute>
-        <AddTargetPage />
+        <Suspense fallback={<PageLoader />}><AddTargetPage /></Suspense>
       </ProtectedRoute>
     ),
   },
@@ -62,7 +72,7 @@ const router = createBrowserRouter([
     path: '/conference/:conferenceId/add',
     element: (
       <ProtectedRoute>
-        <AddTargetPage />
+        <Suspense fallback={<PageLoader />}><AddTargetPage /></Suspense>
       </ProtectedRoute>
     ),
   },
@@ -70,7 +80,7 @@ const router = createBrowserRouter([
     path: '/conference/:conferenceId/coverage',
     element: (
       <ProtectedRoute>
-        <CoverageDashboard />
+        <Suspense fallback={<PageLoader />}><CoverageDashboard /></Suspense>
       </ProtectedRoute>
     ),
   },
