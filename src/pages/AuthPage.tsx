@@ -40,7 +40,7 @@ export function AuthPage() {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!code.trim() || code.length < 6) return
+    if (!code.trim() || code.length < 8) return
 
     setVerifying(true)
     setError(null)
@@ -79,7 +79,7 @@ export function AuthPage() {
             </div>
             <h2 className="text-[var(--text)] font-semibold text-lg mb-1 text-center">Check your email</h2>
             <p className="text-[var(--text-secondary)] text-sm mb-6 text-center">
-              Enter the 6-digit code sent to <span className="text-[var(--text)] font-medium">{email}</span>
+              Enter the 8-digit code sent to <span className="text-[var(--text)] font-medium">{email}</span>
             </p>
 
             <form onSubmit={handleVerify} className="space-y-4">
@@ -88,10 +88,10 @@ export function AuthPage() {
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={6}
+                maxLength={8}
                 value={code}
                 onChange={(e) => { setCode(e.target.value.replace(/\D/g, '')); setError(null) }}
-                placeholder="123456"
+                placeholder="12345678"
                 className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-4 py-4 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-2xl tracking-widest text-center font-mono"
                 autoComplete="one-time-code"
                 required
@@ -105,7 +105,7 @@ export function AuthPage() {
 
               <button
                 type="submit"
-                disabled={verifying || code.length < 6}
+                disabled={verifying || code.length < 8}
                 className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-[var(--bg-deep)] disabled:text-[var(--text-muted)] text-[var(--text)] font-semibold py-3 rounded-xl transition-colors text-sm"
               >
                 {verifying ? (
