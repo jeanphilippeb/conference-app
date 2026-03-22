@@ -13,6 +13,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { useAuthContext } from '@/context/AuthContext'
 import { useGameSheet } from '@/context/GameSheetContext'
 import { GameHeaderButton } from '@/components/GameHeaderButton'
@@ -35,6 +36,8 @@ interface ConferenceInfo {
   start_date: string
   end_date: string
 }
+
+const conferenceInfoCache = new Map<string, ConferenceInfo>()
 
 function TargetRow({ target, currentUserId, onClick }: {
   target: Target
@@ -118,12 +121,22 @@ export function ListView() {
   const { conferenceId } = useParams<{ conferenceId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, loading } = useTargets(conferenceId)
-  const [conference, setConference] = useState<ConferenceInfo | null>(null)
+  const { targets, loading, refetch } = useTargets(conferenceId)
+  useRealtimeSync(conferenceId, refetch)
+  const [conference, setConference] = useState<ConferenceInfo | null>(
+    conferenceId ? (conferenceInfoCache.get(conferenceId) ?? null) : null
+  )
   const { setContext } = useGameSheet()
 
   useEffect(() => {
     if (!conferenceId) return
+
+    // Use cache immediately if available
+    const cached = conferenceInfoCache.get(conferenceId)
+    if (cached) {
+      setContext({ conferenceId, conferenceName: cached.name })
+    }
+
     supabase
       .from('conference_conferences')
       .select('name, start_date, end_date')
@@ -131,6 +144,7 @@ export function ListView() {
       .single()
       .then(({ data }) => {
         if (data) {
+          conferenceInfoCache.set(conferenceId, data as ConferenceInfo)
           setConference(data as ConferenceInfo)
           setContext({ conferenceId, conferenceName: (data as ConferenceInfo).name })
         }

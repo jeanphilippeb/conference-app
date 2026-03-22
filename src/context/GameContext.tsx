@@ -25,8 +25,9 @@ interface GameContextValue {
   streakActive: boolean
   // actions
   triggerMet: (priority: Priority) => Promise<{ pts: number }>
-  triggerNote: (priority: Priority, pts: number) => void
-  triggerFollowup: (priority: Priority, pts: number) => void
+  triggerNote: (priority: Priority, pts: number) => Promise<void>
+  triggerFollowup: (priority: Priority, pts: number) => Promise<void>
+  triggerGrandSlam: () => void
   showToast: (message: string, category: ToastCategory) => void
   // state
   toasts: ToastData[]
@@ -229,16 +230,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { pts }
   }, [updateStreakAndGetMultiplier, todayMeetings, incrementLifetimeScore, checkLevelUp, showToast])
 
-  const triggerNote = useCallback((_priority: Priority, pts: number) => {
+  const triggerNote = useCallback(async (_priority: Priority, pts: number) => {
     if (pts > 0) {
+      const { oldScore, newScore } = await incrementLifetimeScore(pts)
+      checkLevelUp(oldScore, newScore)
       showToast(getRandomToast('note_added', { pts }), 'note_added')
     }
-  }, [showToast])
+  }, [incrementLifetimeScore, checkLevelUp, showToast])
 
-  const triggerFollowup = useCallback((_priority: Priority, pts: number) => {
+  const triggerFollowup = useCallback(async (_priority: Priority, pts: number) => {
     if (pts > 0) {
+      const { oldScore, newScore } = await incrementLifetimeScore(pts)
+      checkLevelUp(oldScore, newScore)
       showToast(getRandomToast('followup_added', { pts }), 'followup_added')
     }
+  }, [incrementLifetimeScore, checkLevelUp, showToast])
+
+  const triggerGrandSlam = useCallback(() => {
+    setGrandSlamActive(true)
+    showToast(getRandomToast('grand_slam', {}), 'grand_slam')
   }, [showToast])
 
   const clearLevelUp = useCallback(() => setLevelUpData(null), [])
@@ -256,6 +266,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       triggerMet,
       triggerNote,
       triggerFollowup,
+      triggerGrandSlam,
       showToast,
       toasts,
       dismissToast,

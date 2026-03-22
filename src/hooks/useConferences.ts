@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Conference } from '@/lib/types'
 
@@ -10,6 +10,7 @@ export function useConferences() {
   const [conferences, setConferences] = useState<Conference[]>(conferencesCache ?? [])
   const [loading, setLoading] = useState(conferencesCache === null)
   const [error, setError] = useState<string | null>(null)
+  const hasRetried = useRef(false)
 
   const fetchConferences = useCallback(async () => {
     // Only show skeleton on first load — if cache exists, refetch silently
@@ -62,6 +63,18 @@ export function useConferences() {
   useEffect(() => {
     fetchConferences()
   }, [fetchConferences])
+
+  // Auto-retry once after 2s on fetch failure (handles PWA cold-start network issues)
+  useEffect(() => {
+    if (!error || hasRetried.current) return
+    hasRetried.current = true
+    const timer = setTimeout(() => {
+      conferencesCache = null
+      setError(null)
+      fetchConferences()
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [error, fetchConferences])
 
   const invalidateCache = () => { conferencesCache = null }
 
