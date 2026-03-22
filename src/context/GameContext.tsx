@@ -72,15 +72,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const streakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load lifetime score + today's meeting count from DB on mount
+  // and re-load whenever the user signs in or out
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { setScoreLoading(false); return }
-      const userId = data.user.id
-
+    const loadScore = async (userId: string) => {
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
 
-      Promise.all([
+      const [{ data: profile }, { count }] = await Promise.all([
         supabase
           .from('conference_profiles')
           .select('lifetime_score')
@@ -92,15 +90,40 @@ export function GameProvider({ children }: { children: ReactNode }) {
           .eq('user_id', userId)
           .eq('status', 'met')
           .gte('met_at', todayStart.toISOString()),
-      ]).then(([{ data: profile }, { count }]) => {
-        if (profile?.lifetime_score) {
-          lifetimeScoreRef.current = profile.lifetime_score
-          setLifetimeScore(profile.lifetime_score)
+      ])
+
+      if (profile?.lifetime_score) {
+        lifetimeScoreRef.current = profile.lifetime_score
+        setLifetimeScore(profile.lifetime_score)
+      } else {
+        lifetimeScoreRef.current = 0
+        setLifetimeScore(0)
+      }
+      setTodayMeetings(count || 0)
+      setScoreLoading(false)
+    }
+
+    const resetScore = () => {
+      lifetimeScoreRef.current = 0
+      setLifetimeScore(0)
+      setTodayMeetings(0)
+      setScoreLoading(false)
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          setScoreLoading(true)
+          loadScore(session.user.id)
+        } else {
+          resetScore()
         }
-        setTodayMeetings(count || 0)
-        setScoreLoading(false)
-      })
-    })
+      }
+    )
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Keep ref in sync
