@@ -85,7 +85,7 @@ export function CardView() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
   const { targets, createInteraction, updateInteractionNotes } = useTargets(conferenceId)
-  const { triggerMet, triggerNote, getStreakMultiplier } = useGame()
+  const { triggerMet, triggerNote, triggerGrandSlam, getStreakMultiplier, showToast } = useGame()
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText()
 
   const [note, setNote] = useState('')
@@ -107,6 +107,11 @@ export function CardView() {
   const myInteraction = user?.id
     ? target?.interactions?.find(i => i.user_id === user.id && i.status === 'met')
     : undefined
+
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
 
   // Load existing note from my interaction
   useEffect(() => {
@@ -177,19 +182,46 @@ export function CardView() {
 
       // Show points floater
       setFloatingPts(pts)
+
+      // Check Grand Slam: all must_meet targets now met
+      if (target.priority === 'must_meet') {
+        const mustMeets = targets.filter(t => t.priority === 'must_meet')
+        const allMet = mustMeets.every(t =>
+          t.id === targetId || (t.interactions || []).some(i => i.status === 'met')
+        )
+        if (allMet && mustMeets.length > 0) triggerGrandSlam()
+      }
     } catch (err) {
       console.error(err)
+      showToast('Failed to save — please try again', 'app_open')
     } finally {
       setMarkingMet(false)
     }
   }
 
   if (!target) {
+    // If targets are loaded but this ID doesn't exist, show not-found state
+    const isLoaded = targets.length > 0
     return (
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-[var(--text-secondary)] text-sm">Loading...</p>
+        <div className="text-center px-6">
+          {isLoaded ? (
+            <>
+              <p className="text-[var(--text)] font-semibold mb-1">Contact not found</p>
+              <p className="text-[var(--text-secondary)] text-sm mb-4">This contact may have been removed.</p>
+              <button
+                onClick={() => navigate(-1)}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium"
+              >
+                Go back
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-[var(--text-secondary)] text-sm">Loading...</p>
+            </>
+          )}
         </div>
       </div>
     )

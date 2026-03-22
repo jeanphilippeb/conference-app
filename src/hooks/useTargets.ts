@@ -109,8 +109,25 @@ export function useTargets(conferenceId: string | undefined) {
       .single()
 
     if (error) throw error
-    await fetchTargets()
-    return data as Interaction
+
+    const newInteraction = data as Interaction
+
+    // Optimistically update state so the UI reflects the change immediately
+    // without blocking on a full refetch
+    setTargets(prev => {
+      const updated = prev.map(t => {
+        if (t.id !== targetId) return t
+        const interactions = [newInteraction, ...(t.interactions || [])]
+        return { ...t, interactions, latest_interaction: interactions[0] }
+      })
+      if (conferenceId) targetsCache.set(conferenceId, updated)
+      return updated
+    })
+
+    // Background refetch to sync any other changes
+    fetchTargets()
+
+    return newInteraction
   }
 
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
