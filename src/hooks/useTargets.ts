@@ -6,6 +6,10 @@ import { Target, Interaction } from '@/lib/types'
 // data immediately instead of showing a loading skeleton.
 const targetsCache = new Map<string, Target[]>()
 
+export function clearTargetsCache(conferenceId: string) {
+  targetsCache.delete(conferenceId)
+}
+
 export function useTargets(conferenceId: string | undefined) {
   const cached = conferenceId ? targetsCache.get(conferenceId) : undefined
   const [targets, setTargets] = useState<Target[]>(cached ?? [])

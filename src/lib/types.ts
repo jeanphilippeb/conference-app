@@ -36,6 +36,7 @@ export interface Target {
   email?: string;
   photo_url?: string;
   linkedin_url?: string;
+  booth_number?: string;
   priority: Priority;
   pre_notes?: string;
   tags?: string[];
