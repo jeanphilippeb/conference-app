@@ -105,10 +105,81 @@ export function MetalLevelDetailContent({ targets, lifetimeScore, currentLevel }
         </div>
       )}
 
+      {/* Scoring breakdown */}
+      <div className="px-5 mb-6">
+        <p className="text-[var(--text-secondary)] text-[10px] font-semibold uppercase tracking-widest mb-3">
+          How Points Work
+        </p>
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}>
+          {/* Base scores */}
+          <div className="px-4 pt-3 pb-2">
+            <p className="text-[var(--text-muted)] text-[10px] font-semibold uppercase tracking-wider mb-2">Base (per meeting)</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                  Must Meet
+                </span>
+                <span className="text-sm font-bold text-yellow-400">30 pts</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                  Should Meet
+                </span>
+                <span className="text-sm font-bold text-yellow-400">20 pts</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <span className="w-2 h-2 rounded-full bg-slate-500 flex-shrink-0" />
+                  Nice to Have
+                </span>
+                <span className="text-sm font-bold text-yellow-400">10 pts</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px mx-4" style={{ background: 'var(--border)' }} />
+
+          {/* Bonuses */}
+          <div className="px-4 pt-2 pb-3">
+            <p className="text-[var(--text-muted)] text-[10px] font-semibold uppercase tracking-wider mb-2">Bonuses</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">☀️ First meeting of the day</span>
+                <span className="text-sm font-bold text-yellow-400">+10 pts</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">🔥 Streak (3+ in 1 hour)</span>
+                <span className="text-sm font-bold text-yellow-400">×1.5</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">🔥🔥 Streak (4+ in 1 hour)</span>
+                <span className="text-sm font-bold text-yellow-400">×2.0</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">📝 Detailed notes added</span>
+                <span className="text-sm font-bold text-yellow-400">+5–15 pts</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px mx-4" style={{ background: 'var(--border)' }} />
+
+          {/* Example */}
+          <div className="px-4 pt-2 pb-3">
+            <p className="text-[var(--text-muted)] text-[10px] font-semibold uppercase tracking-wider mb-2">Example</p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Must Meet · first of day · 3rd meeting in an hour → (30 + 10) × 1.5 = <span className="text-yellow-400 font-bold">60 pts</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Achievements */}
       <div className="px-5">
         <p className="text-[var(--text-secondary)] text-[10px] font-semibold uppercase tracking-widest mb-4">
-          Achievements
+          Achievements — tap to learn more
         </p>
         <AchievementGrid targets={targets} lifetimeScore={lifetimeScore} />
       </div>

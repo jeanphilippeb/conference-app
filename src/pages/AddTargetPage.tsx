@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/context/AuthContext'
 import { Priority } from '@/lib/types'
+import { clearTargetsCache } from '@/hooks/useTargets'
 
 const PRIORITY_OPTIONS: { value: Priority; label: string; description: string }[] = [
   { value: 'must_meet', label: 'Must Meet', description: 'Critical contact for this conference' },
@@ -16,6 +17,7 @@ interface FormData {
   last_name: string
   company: string
   role: string
+  booth_number: string
   priority: Priority
   phone: string
   email: string
@@ -30,6 +32,7 @@ const DEFAULT_FORM: FormData = {
   last_name: '',
   company: '',
   role: '',
+  booth_number: '',
   priority: 'should_meet',
   phone: '',
   email: '',
@@ -71,6 +74,7 @@ export function AddTargetPage() {
             last_name: data.last_name || '',
             company: data.company || '',
             role: data.role || '',
+            booth_number: data.booth_number || '',
             priority: data.priority || 'should_meet',
             phone: data.phone || '',
             email: data.email || '',
@@ -106,6 +110,7 @@ export function AddTargetPage() {
     try {
       const { error } = await supabase.from('conference_targets').delete().eq('id', targetId)
       if (error) throw error
+      if (conferenceId) clearTargetsCache(conferenceId)
       navigate(`/conference/${conferenceId}`, { replace: true })
     } catch (err: any) {
       setError(err.message || 'Failed to delete target')
@@ -135,6 +140,7 @@ export function AddTargetPage() {
         last_name: form.last_name,
         company: form.company,
         role: form.role || null,
+        booth_number: form.booth_number || null,
         priority: form.priority,
         phone: form.phone || null,
         email: form.email || null,
@@ -152,6 +158,7 @@ export function AddTargetPage() {
           .update(payload)
           .eq('id', targetId)
         if (error) throw error
+        if (conferenceId) clearTargetsCache(conferenceId)
         navigate(-1)
       } else {
         const { data, error } = await supabase
@@ -160,6 +167,7 @@ export function AddTargetPage() {
           .select()
           .single()
         if (error) throw error
+        if (conferenceId) clearTargetsCache(conferenceId)
         navigate(`/conference/${conferenceId}/target/${data.id}`, { replace: true })
       }
     } catch (err: any) {
@@ -238,16 +246,28 @@ export function AddTargetPage() {
           />
         </div>
 
-        {/* Role */}
-        <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Role / Title</label>
-          <input
-            type="text"
-            value={form.role}
-            onChange={(e) => handleChange('role', e.target.value)}
-            placeholder="VP of Sales"
-            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
-          />
+        {/* Role + Booth */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Role / Title</label>
+            <input
+              type="text"
+              value={form.role}
+              onChange={(e) => handleChange('role', e.target.value)}
+              placeholder="VP of Sales"
+              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Booth #</label>
+            <input
+              type="text"
+              value={form.booth_number}
+              onChange={(e) => handleChange('booth_number', e.target.value)}
+              placeholder="e.g. A42"
+              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
+            />
+          </div>
         </div>
 
         {/* Priority */}

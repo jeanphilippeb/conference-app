@@ -19,11 +19,12 @@ export interface LevelUpData {
 
 interface GameContextValue {
   lifetimeScore: number
+  scoreLoading: boolean
   currentLevel: MetalLevel
   streakCount: number
   streakActive: boolean
   // actions
-  triggerMet: (priority: Priority, myInteractionTimestamps: string[]) => Promise<{ pts: number }>
+  triggerMet: (priority: Priority) => Promise<{ pts: number }>
   triggerNote: (priority: Priority, pts: number) => void
   triggerFollowup: (priority: Priority, pts: number) => void
   showToast: (message: string, category: ToastCategory) => void
@@ -55,31 +56,57 @@ const TOAST_BORDER_COLORS: Record<ToastCategory, string> = {
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [lifetimeScore, setLifetimeScore] = useState(0)
+  const [scoreLoading, setScoreLoading] = useState(true)
+  // Track how many meetings the current user has recorded today (loaded from DB + updated in-session)
+  const [todayMeetings, setTodayMeetings] = useState(0)
   const [toasts, setToasts] = useState<ToastData[]>([])
   const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null)
   const [grandSlamActive, setGrandSlamActive] = useState(false)
 
-  // Streak tracking (in-memory)
+  // Ref keeps score always-current so callbacks don't capture stale closures
+  const lifetimeScoreRef = useRef(0)
+
+  // Streak tracking (in-memory, intentional: resets on page reload)
   const interactionTimestamps = useRef<number[]>([])
   const [streakCount, setStreakCount] = useState(0)
   const streakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load lifetime score from profile on mount
+  // Load lifetime score + today's meeting count from DB on mount
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) return
-      supabase
-        .from('conference_profiles')
-        .select('lifetime_score')
-        .eq('id', data.user.id)
-        .single()
-        .then(({ data: profile }) => {
-          if (profile?.lifetime_score) {
-            setLifetimeScore(profile.lifetime_score)
-          }
-        })
+      if (!data.user) { setScoreLoading(false); return }
+      const userId = data.user.id
+
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+
+      Promise.all([
+        supabase
+          .from('conference_profiles')
+          .select('lifetime_score')
+          .eq('id', userId)
+          .single(),
+        supabase
+          .from('conference_interactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('status', 'met')
+          .gte('met_at', todayStart.toISOString()),
+      ]).then(([{ data: profile }, { count }]) => {
+        if (profile?.lifetime_score) {
+          lifetimeScoreRef.current = profile.lifetime_score
+          setLifetimeScore(profile.lifetime_score)
+        }
+        setTodayMeetings(count || 0)
+        setScoreLoading(false)
+      })
     })
   }, [])
+
+  // Keep ref in sync
+  useEffect(() => {
+    lifetimeScoreRef.current = lifetimeScore
+  }, [lifetimeScore])
 
   const currentLevel = getCurrentLevel(lifetimeScore)
 
@@ -105,13 +132,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const updateStreakAndGetMultiplier = useCallback((): number => {
     const now = Date.now()
     const oneHourAgo = now - 60 * 60 * 1000
-    // Clean old timestamps
     interactionTimestamps.current = interactionTimestamps.current.filter(t => t > oneHourAgo)
     interactionTimestamps.current.push(now)
 
     const count = interactionTimestamps.current.length
 
-    // Reset timer
     if (streakTimerRef.current) clearTimeout(streakTimerRef.current)
     streakTimerRef.current = setTimeout(() => {
       interactionTimestamps.current = []
@@ -119,9 +144,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }, 60 * 60 * 1000)
 
     if (count >= 3) {
-      const newStreak = count - 2 // streak level starts at 1 when 3rd interaction
+      const newStreak = count - 2
       setStreakCount(newStreak)
-      return 1 + (newStreak * 0.5) // 1.5, 2.0, 2.5...
+      return 1 + (newStreak * 0.5) // ×1.5, ×2.0, ×2.5…
     }
     return 1
   }, [])
@@ -137,9 +162,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return 1
   }, [])
 
+  // Use ref to avoid stale closure — always reads the latest score
   const incrementLifetimeScore = useCallback(async (pts: number): Promise<{ oldScore: number; newScore: number }> => {
-    const oldScore = lifetimeScore
+    const oldScore = lifetimeScoreRef.current
     const newScore = oldScore + pts
+    lifetimeScoreRef.current = newScore
     setLifetimeScore(newScore)
 
     const { data } = await supabase.auth.getUser()
@@ -150,7 +177,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         .eq('id', data.user.id)
     }
     return { oldScore, newScore }
-  }, [lifetimeScore])
+  }, []) // no dependency on lifetimeScore — uses ref instead
 
   const checkLevelUp = useCallback((oldScore: number, newScore: number) => {
     const oldLevel = getCurrentLevel(oldScore)
@@ -166,13 +193,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [showToast])
 
-  const triggerMet = useCallback(async (priority: Priority, myInteractionTimestamps: string[]) => {
+  // triggerMet no longer takes timestamps — firstOfDay is tracked globally in context
+  const triggerMet = useCallback(async (priority: Priority) => {
     const multiplier = updateStreakAndGetMultiplier()
-    const firstOfDay = !myInteractionTimestamps.some(ts => {
-      const d = new Date(ts)
-      const today = new Date()
-      return d.toDateString() === today.toDateString()
-    })
+
+    // True first-of-day: checks global meeting count for today, not per-target
+    const firstOfDay = todayMeetings === 0
 
     const bonuses: ScoreBonuses = {
       firstOfDay,
@@ -184,7 +210,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const { oldScore, newScore } = await incrementLifetimeScore(pts)
     checkLevelUp(oldScore, newScore)
 
-    // Streak toast if active
+    // Update today's count
+    setTodayMeetings(prev => prev + 1)
+
     if (multiplier > 1) {
       const streak = Math.round((multiplier - 1) / 0.5)
       showToast(
@@ -192,7 +220,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
         'streak'
       )
     } else {
-      // Regular met toast
       const category: ToastCategory =
         priority === 'must_meet' ? 'met_must' :
         priority === 'should_meet' ? 'met_should' : 'met_nice'
@@ -200,15 +227,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     return { pts }
-  }, [updateStreakAndGetMultiplier, incrementLifetimeScore, checkLevelUp, showToast])
+  }, [updateStreakAndGetMultiplier, todayMeetings, incrementLifetimeScore, checkLevelUp, showToast])
 
-  const triggerNote = useCallback((priority: Priority, pts: number) => {
+  const triggerNote = useCallback((_priority: Priority, pts: number) => {
     if (pts > 0) {
       showToast(getRandomToast('note_added', { pts }), 'note_added')
     }
   }, [showToast])
 
-  const triggerFollowup = useCallback((priority: Priority, pts: number) => {
+  const triggerFollowup = useCallback((_priority: Priority, pts: number) => {
     if (pts > 0) {
       showToast(getRandomToast('followup_added', { pts }), 'followup_added')
     }
@@ -222,6 +249,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   return (
     <GameContext.Provider value={{
       lifetimeScore,
+      scoreLoading,
       currentLevel,
       streakCount,
       streakActive,

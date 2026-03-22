@@ -99,9 +99,16 @@ function TargetTile({ target, currentUserId, onClick }: {
             </div>
           </div>
         )}
-        <p className="text-[var(--text)] font-semibold text-xs leading-tight truncate">
-          {target.first_name} {target.last_name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-[var(--text)] font-semibold text-xs leading-tight truncate flex-1">
+            {target.first_name} {target.last_name}
+          </p>
+          {target.booth_number && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-black/40 text-white/80 font-medium flex-shrink-0">
+              #{target.booth_number}
+            </span>
+          )}
+        </div>
         <p className="text-[var(--text)]/60 text-[10px] leading-tight truncate">{target.company}</p>
       </div>
     </button>

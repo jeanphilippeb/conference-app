@@ -92,6 +92,12 @@ function TargetRow({ target, currentUserId, onClick }: {
               <span className="text-[var(--text-muted)] text-xs truncate">{target.role}</span>
             </>
           )}
+          {target.booth_number && (
+            <>
+              <span className="text-[var(--text-muted)] text-xs">·</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-deep)] text-[var(--text-secondary)] font-medium flex-shrink-0">#{target.booth_number}</span>
+            </>
+          )}
         </div>
       </div>
 

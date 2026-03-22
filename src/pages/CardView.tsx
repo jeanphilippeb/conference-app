@@ -170,12 +170,7 @@ export function CardView() {
     if (!targetId || !target) return
     setMarkingMet(true)
     try {
-      // Get all my past interaction timestamps for firstOfDay detection
-      const myTimestamps = (target.interactions || [])
-        .filter(i => i.user_id === user?.id)
-        .map(i => i.met_at)
-
-      const { pts } = await triggerMet(target.priority, myTimestamps)
+      const { pts } = await triggerMet(target.priority)
 
       // Create interaction with score
       await createInteraction(targetId, note, 'met', pts)
@@ -257,9 +252,16 @@ export function CardView() {
               {target.company && (
                 <p className="text-[var(--text-secondary)] text-base mt-0.5">{target.company}</p>
               )}
-              {target.role && (
-                <p className="text-[var(--text-muted)] text-sm mt-0.5">{target.role}</p>
-              )}
+              <div className="flex items-center gap-2 mt-0.5">
+                {target.role && (
+                  <p className="text-[var(--text-muted)] text-sm">{target.role}</p>
+                )}
+                {target.booth_number && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-medium border border-[var(--border)]">
+                    Booth #{target.booth_number}
+                  </span>
+                )}
+              </div>
             </div>
             <span className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold mt-1 ${priorityBadge.bg} ${priorityBadge.text}`}>
               {getPriorityLabel(target.priority)}
