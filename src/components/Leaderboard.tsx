@@ -1,6 +1,7 @@
 import { useLeaderboard, LeaderboardEntry } from '@/hooks/useLeaderboard'
 import { getInitialsColorClass, coveragePercent } from '@/lib/helpers'
 import type { Target } from '@/lib/types'
+import { RefreshCw } from 'lucide-react'
 
 interface LeaderboardProps {
   conferenceId: string
@@ -26,12 +27,18 @@ export function Leaderboard({ conferenceId, conferenceName, onClose }: Leaderboa
   )
 }
 
-export function LeaderboardContent({ conferenceId, conferenceName, targets }: {
+export function LeaderboardContent({ conferenceId, conferenceName, targets, entries: entriesProp, loading: loadingProp }: {
   conferenceId?: string
   conferenceName?: string
   targets: Target[]
+  // When called from GameSheet, data is pre-loaded and passed as props
+  entries?: LeaderboardEntry[]
+  loading?: boolean
 }) {
-  const { entries, loading } = useLeaderboard(conferenceId)
+  // Fallback: fetch independently when not pre-loaded (e.g. standalone Leaderboard modal)
+  const { entries: fetchedEntries, loading: fetchedLoading } = useLeaderboard(conferenceId)
+  const entries = entriesProp ?? fetchedEntries
+  const loading = loadingProp ?? fetchedLoading
 
   const totalTargets = targets.length
   const totalMet = targets.filter(t => (t.interactions || []).some(i => i.status === 'met')).length
