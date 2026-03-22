@@ -1,13 +1,14 @@
-import { useRef, useState, useEffect, ReactNode } from 'react'
+import { useRef, useState, useEffect, ReactNode, RefObject } from 'react'
 
 interface SwipeableSheetProps {
   open: boolean
   onClose: () => void
   children: ReactNode
   maxHeight?: string
+  scrollRef?: RefObject<HTMLDivElement | null>
 }
 
-export function SwipeableSheet({ open, onClose, children, maxHeight = '88vh' }: SwipeableSheetProps) {
+export function SwipeableSheet({ open, onClose, children, maxHeight = '88vh', scrollRef }: SwipeableSheetProps) {
   const [dragY, setDragY] = useState(0)
   const [visible, setVisible] = useState(false)
   const startYRef = useRef(0)
@@ -84,7 +85,7 @@ export function SwipeableSheet({ open, onClose, children, maxHeight = '88vh' }: 
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
           {children}
         </div>
       </div>

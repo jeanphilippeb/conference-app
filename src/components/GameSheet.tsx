@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useGame } from '@/context/GameContext'
 import { useGameSheet } from '@/context/GameSheetContext'
@@ -19,6 +19,12 @@ export function GameSheet() {
 
   const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false)
   const [refreshingTargets, setRefreshingTargets] = useState(false)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Scroll to top whenever the tab changes
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [tab])
 
   const handleRefreshLeaderboard = async () => {
     setRefreshingLeaderboard(true)
@@ -33,7 +39,7 @@ export function GameSheet() {
   }
 
   return (
-    <SwipeableSheet open={isOpen} onClose={close}>
+    <SwipeableSheet open={isOpen} onClose={close} scrollRef={scrollRef}>
       {/* Tabs */}
       <div className="flex items-center gap-1 px-5 pb-4 pt-1 flex-shrink-0">
         <button
