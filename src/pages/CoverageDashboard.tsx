@@ -47,20 +47,23 @@ export function CoverageDashboard() {
     async function fetchData() {
       setLoading(true)
       setError(null)
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('conference_targets')
+          .select('*, interactions:conference_interactions(*, profile:conference_profiles(id, name, avatar_url))')
+          .eq('conference_id', conferenceId)
 
-      const { data, error: fetchError } = await supabase
-        .from('conference_targets')
-        .select('*, interactions:conference_interactions(*, profile:conference_profiles(id, name, avatar_url))')
-        .eq('conference_id', conferenceId)
+        if (fetchError) {
+          setError(fetchError.message)
+          return
+        }
 
-      if (fetchError) {
-        setError(fetchError.message)
+        setTargets((data as TargetWithInteractions[]) || [])
+      } catch (err: any) {
+        setError(err.message || 'Failed to load coverage data')
+      } finally {
         setLoading(false)
-        return
       }
-
-      setTargets((data as TargetWithInteractions[]) || [])
-      setLoading(false)
     }
 
     fetchData()

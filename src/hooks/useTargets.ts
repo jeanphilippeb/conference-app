@@ -113,6 +113,16 @@ export function useTargets(conferenceId: string | undefined) {
     return data as Interaction
   }
 
+  const deleteInteraction = async (interactionId: string) => {
+    const { error } = await supabase
+      .from('conference_interactions')
+      .delete()
+      .eq('id', interactionId)
+
+    if (error) throw error
+    await fetchTargets()
+  }
+
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
     const { error } = await supabase
       .from('conference_interactions')
@@ -129,6 +139,7 @@ export function useTargets(conferenceId: string | undefined) {
     error,
     refetch: fetchTargets,
     createInteraction,
+    deleteInteraction,
     updateInteractionNotes,
   }
 }

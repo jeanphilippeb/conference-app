@@ -12,6 +12,7 @@ import {
   Check,
   CheckCircle2,
   User,
+  Undo2,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
@@ -84,7 +85,7 @@ export function CardView() {
   const { conferenceId, targetId } = useParams<{ conferenceId: string; targetId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, createInteraction, updateInteractionNotes } = useTargets(conferenceId)
+  const { targets, createInteraction, deleteInteraction, updateInteractionNotes } = useTargets(conferenceId)
   const { triggerMet, triggerNote, getStreakMultiplier } = useGame()
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText()
 
@@ -93,6 +94,8 @@ export function CardView() {
   const [saved, setSaved] = useState(false)
   const [markingMet, setMarkingMet] = useState(false)
   const [floatingPts, setFloatingPts] = useState<number | null>(null)
+  const [undoData, setUndoData] = useState<{ interactionId: string; pts: number } | null>(null)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevNoteRef = useRef('')
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -173,10 +176,15 @@ export function CardView() {
       const { pts } = await triggerMet(target.priority)
 
       // Create interaction with score
-      await createInteraction(targetId, note, 'met', pts)
+      const interaction = await createInteraction(targetId, note, 'met', pts)
 
       // Show points floater
       setFloatingPts(pts)
+
+      // Enable undo for 8 seconds
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      setUndoData({ interactionId: interaction.id, pts })
+      undoTimerRef.current = setTimeout(() => setUndoData(null), 8000)
     } catch (err) {
       console.error(err)
     } finally {
@@ -184,9 +192,29 @@ export function CardView() {
     }
   }
 
+  const handleUndo = async () => {
+    if (!undoData) return
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    try {
+      await deleteInteraction(undoData.interactionId)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setUndoData(null)
+    }
+  }
+
   if (!target) {
     return (
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+        <div className="absolute top-12 left-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-[var(--text)]" />
+          </button>
+        </div>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-[var(--text-secondary)] text-sm">Loading...</p>
@@ -245,8 +273,8 @@ export function CardView() {
         {/* Identity */}
         <div className="mb-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-[var(--text)] font-bold text-[28px] leading-tight tracking-tight">
+            <div className="flex-1">
+              <h1 className="text-[var(--text)] font-bold text-[28px] leading-tight tracking-tight break-words">
                 {target.first_name} {target.last_name}
               </h1>
               {target.company && (
@@ -263,7 +291,7 @@ export function CardView() {
                 )}
               </div>
             </div>
-            <span className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold mt-1 ${priorityBadge.bg} ${priorityBadge.text}`}>
+            <span className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold mt-1 ${priorityBadge.bg} ${priorityBadge.text}`}>
               {getPriorityLabel(target.priority)}
             </span>
           </div>
@@ -397,7 +425,7 @@ export function CardView() {
       </div>
 
       {/* Fixed bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[var(--bg)]/95 backdrop-blur-sm border-t border-[var(--border)] px-5 py-4 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[var(--bg)]/95 backdrop-blur-sm border-t border-[var(--border)] px-5 py-4 safe-bottom">
         {isMetByCurrentUser ? (
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2 py-2">
@@ -408,6 +436,15 @@ export function CardView() {
                   : 'You met them'}
               </span>
             </div>
+            {undoData && (
+              <button
+                onClick={handleUndo}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors"
+              >
+                <Undo2 className="w-4 h-4" />
+                Undo
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -444,7 +481,7 @@ export function CardView() {
               ) : (
                 <>
                   <User className="w-5 h-5" />
-                  {isMetByAnyone ? 'I Also Met Them' : 'I Met Them'}
+                  {isMetByAnyone ? 'I Also Met Him/Her' : 'I Met Him/Her'}
                 </>
               )}
             </button>

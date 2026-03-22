@@ -315,7 +315,7 @@ export function ConferenceSelector() {
       </div>
 
       {/* Fixed bottom button */}
-      <div className="fixed bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/95 to-transparent safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-20 p-5 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/95 to-transparent safe-bottom">
         <button
           onClick={() => setShowModal(true)}
           className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-[var(--text)] font-semibold py-4 rounded-2xl transition-colors shadow-xl shadow-blue-900/30"
