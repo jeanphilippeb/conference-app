@@ -76,8 +76,9 @@ export function useAuth() {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
+    // Hard reload clears all module-level caches (targets, conferences, leaderboard)
+    // and guarantees a clean state for the next user
+    window.location.href = '/auth'
   }
 
   return { user, profile, loading, signInWithEmail, verifyOtp, signOut }

@@ -13,12 +13,17 @@ export interface LeaderboardEntry {
   level: MetalLevel
 }
 
+// Module-level cache keyed by conferenceId (undefined → 'global')
+const leaderboardCache = new Map<string, LeaderboardEntry[]>()
+
 export function useLeaderboard(conferenceId: string | undefined) {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheKey = conferenceId ?? 'global'
+  const cached = leaderboardCache.get(cacheKey)
+  const [entries, setEntries] = useState<LeaderboardEntry[]>(cached ?? [])
+  const [loading, setLoading] = useState(!cached)
 
   const fetchLeaderboard = useCallback(async () => {
-    setLoading(true)
+    if (!leaderboardCache.has(cacheKey)) setLoading(true)
 
     try {
       if (!conferenceId) {
@@ -41,6 +46,7 @@ export function useLeaderboard(conferenceId: string | undefined) {
           level: getCurrentLevel(p.lifetime_score || 0),
         }))
 
+        leaderboardCache.set(cacheKey, sorted)
         setEntries(sorted)
         return
       }
@@ -116,13 +122,14 @@ export function useLeaderboard(conferenceId: string | undefined) {
         }))
         .sort((a, b) => b.conferenceScore - a.conferenceScore)
 
+      leaderboardCache.set(cacheKey, sorted)
       setEntries(sorted)
     } catch (err) {
       console.error('Leaderboard fetch error:', err)
     } finally {
       setLoading(false)
     }
-  }, [conferenceId])
+  }, [conferenceId, cacheKey])
 
   useEffect(() => {
     fetchLeaderboard()

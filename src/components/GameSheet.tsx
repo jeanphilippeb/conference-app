@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { useGame } from '@/context/GameContext'
 import { useGameSheet } from '@/context/GameSheetContext'
 import { useTargets } from '@/hooks/useTargets'
+import { useLeaderboard } from '@/hooks/useLeaderboard'
 import { SwipeableSheet } from './SwipeableSheet'
 import { MetalLevelDetailContent } from './MetalLevelDetail'
 import { LeaderboardContent } from './Leaderboard'
@@ -11,11 +13,33 @@ export function GameSheet() {
   const { currentLevel, lifetimeScore } = useGame()
   const [tab, setTab] = useState<'profile' | 'leaderboard'>('profile')
 
-  // Single shared fetch — passed down to both tabs to avoid duplicate requests
-  const { targets } = useTargets(conferenceId)
+  // Pre-load both data sources regardless of active tab
+  const { targets, refetch: refetchTargets } = useTargets(conferenceId)
+  const { entries, loading: leaderboardLoading, refetch: refetchLeaderboard } = useLeaderboard(conferenceId)
+
+  const [refreshingLeaderboard, setRefreshingLeaderboard] = useState(false)
+  const [refreshingTargets, setRefreshingTargets] = useState(false)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Scroll to top whenever the tab changes
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [tab])
+
+  const handleRefreshLeaderboard = async () => {
+    setRefreshingLeaderboard(true)
+    await refetchLeaderboard()
+    setRefreshingLeaderboard(false)
+  }
+
+  const handleRefreshTargets = async () => {
+    setRefreshingTargets(true)
+    await refetchTargets()
+    setRefreshingTargets(false)
+  }
 
   return (
-    <SwipeableSheet open={isOpen} onClose={close}>
+    <SwipeableSheet open={isOpen} onClose={close} scrollRef={scrollRef}>
       {/* Tabs */}
       <div className="flex items-center gap-1 px-5 pb-4 pt-1 flex-shrink-0">
         <button
@@ -43,6 +67,16 @@ export function GameSheet() {
         >
           🏆 Leaderboard
         </button>
+
+        {/* Refresh button — context-aware */}
+        <button
+          onClick={tab === 'leaderboard' ? handleRefreshLeaderboard : handleRefreshTargets}
+          disabled={tab === 'leaderboard' ? refreshingLeaderboard : refreshingTargets}
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0 disabled:opacity-40"
+          title="Refresh"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-[var(--text-muted)] ${(tab === 'leaderboard' ? refreshingLeaderboard : refreshingTargets) ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Content */}
@@ -53,6 +87,8 @@ export function GameSheet() {
           conferenceId={conferenceId}
           conferenceName={conferenceName}
           targets={targets}
+          entries={entries}
+          loading={leaderboardLoading}
         />
       )}
     </SwipeableSheet>
