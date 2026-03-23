@@ -84,7 +84,7 @@ export function CardView() {
   const { conferenceId, targetId } = useParams<{ conferenceId: string; targetId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, createInteraction, updateInteractionNotes } = useTargets(conferenceId)
+  const { targets, loading: targetsLoading, createInteraction, updateInteractionNotes } = useTargets(conferenceId)
   const { triggerMet, triggerNote, getStreakMultiplier } = useGame()
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText()
 
@@ -184,12 +184,29 @@ export function CardView() {
     }
   }
 
-  if (!target) {
+  if (targetsLoading) {
     return (
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-[var(--text-secondary)] text-sm">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!target) {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+        <div className="text-center px-6">
+          <p className="text-[var(--text)] font-medium mb-2">Target not found</p>
+          <p className="text-[var(--text-muted)] text-sm mb-6">This target may have been deleted or moved.</p>
+          <button
+            onClick={() => navigate(`/conference/${conferenceId}`)}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors"
+          >
+            Back to conference
+          </button>
         </div>
       </div>
     )

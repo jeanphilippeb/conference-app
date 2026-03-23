@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ArrowLeft, Save, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -53,8 +53,14 @@ export function AddTargetPage() {
   const [fetchLoading, setFetchLoading] = useState(!!targetId)
   const [error, setError] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
+  const errorRef = useRef<HTMLParagraphElement | null>(null)
 
   const isEdit = !!targetId
+
+  // Scroll error into view so it's always visible
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [error])
 
   // Load existing target for edit
   useEffect(() => {
@@ -408,7 +414,7 @@ export function AddTargetPage() {
         </div>
 
         {error && (
-          <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+          <p ref={errorRef} className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
             {error}
           </p>
         )}
