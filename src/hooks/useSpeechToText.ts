@@ -4,10 +4,30 @@ export function useSpeechToText() {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+
+  const stopListening = () => {
+    // Update UI immediately so button never stays stuck
+    setIsListening(false);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    try {
+      recognition?.stop();
+    } catch {
+      try { recognition?.abort(); } catch {}
+    }
+  };
 
   const startListening = (onResult: (text: string) => void) => {
     if (!isSupported) return;
+    // Stop any in-progress session first
+    stopListening();
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -28,21 +48,25 @@ export function useSpeechToText() {
     };
 
     recognition.onerror = () => {
-      setIsListening(false);
+      stopListening();
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // Only update state if this instance is still the active one
+      if (recognitionRef.current === recognition) {
+        stopListening();
+      }
     };
 
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsListening(true);
-  };
-
-  const stopListening = () => {
-    recognitionRef.current?.stop();
-    setIsListening(false);
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsListening(true);
+      // Safety timeout: auto-stop after 60s to prevent permanent freeze
+      timeoutRef.current = setTimeout(() => stopListening(), 60000);
+    } catch {
+      setIsListening(false);
+    }
   };
 
   const resetTranscript = () => {
