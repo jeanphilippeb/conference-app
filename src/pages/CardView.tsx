@@ -93,9 +93,14 @@ export function CardView() {
   const [saved, setSaved] = useState(false)
   const [markingMet, setMarkingMet] = useState(false)
   const [floatingPts, setFloatingPts] = useState<number | null>(null)
+  // For adding a second (or more) meeting note when already met
+  const [addingNote, setAddingNote] = useState(false)
+  const [newNote, setNewNote] = useState('')
+  const [savingNew, setSavingNew] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevNoteRef = useRef('')
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const newNoteRef = useRef<HTMLTextAreaElement>(null)
 
   const target: Target | undefined = targets.find(t => t.id === targetId)
 
@@ -116,7 +121,7 @@ export function CardView() {
     }
   }, [myInteraction?.id])
 
-  // Auto-save debounce
+  // Auto-save debounce for existing note
   const autoSave = useCallback(async (text: string) => {
     if (!myInteraction) return
     setSaving(true)
@@ -155,14 +160,19 @@ export function CardView() {
     if (isListening) {
       stopListening()
     } else {
+      const targetRef = addingNote ? newNoteRef : noteTextareaRef
       startListening((text) => {
-        setNote(prev => {
-          const newNote = prev ? `${prev} ${text}` : text
-          handleNoteChange(newNote)
-          return newNote
-        })
+        if (addingNote) {
+          setNewNote(prev => prev ? `${prev} ${text}` : text)
+        } else {
+          setNote(prev => {
+            const updated = prev ? `${prev} ${text}` : text
+            handleNoteChange(updated)
+            return updated
+          })
+        }
       })
-      noteTextareaRef.current?.focus()
+      targetRef.current?.focus()
     }
   }
 
@@ -171,16 +181,26 @@ export function CardView() {
     setMarkingMet(true)
     try {
       const { pts } = await triggerMet(target.priority)
-
-      // Create interaction with score
       await createInteraction(targetId, note, 'met', pts)
-
-      // Show points floater
       setFloatingPts(pts)
     } catch (err) {
       console.error(err)
     } finally {
       setMarkingMet(false)
+    }
+  }
+
+  const handleSaveNewNote = async () => {
+    if (!targetId || !target || !newNote.trim()) return
+    setSavingNew(true)
+    try {
+      await createInteraction(targetId, newNote.trim(), 'met', 0)
+      setNewNote('')
+      setAddingNote(false)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSavingNew(false)
     }
   }
 
@@ -396,7 +416,7 @@ export function CardView() {
                 rows={4}
                 className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm resize-none pr-12"
               />
-              {isSupported && (
+              {isSupported && !addingNote && (
                 <button
                   onClick={handleMicToggle}
                   className={`absolute right-3 bottom-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
@@ -416,16 +436,74 @@ export function CardView() {
       {/* Fixed bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[var(--bg)]/95 backdrop-blur-sm border-t border-[var(--border)] px-5 py-4 safe-bottom">
         {isMetByCurrentUser ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-2 py-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span className="text-emerald-400 font-semibold">
-                {metInteractions.length > 1
-                  ? `Met by ${metInteractions.length} people`
-                  : 'You met them'}
-              </span>
+          addingNote ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">New meeting note</span>
+                <button
+                  onClick={() => { setAddingNote(false); setNewNote(''); stopListening(); }}
+                  className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="relative">
+                <textarea
+                  ref={newNoteRef}
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="What did you talk about this time?"
+                  rows={3}
+                  autoFocus
+                  className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm resize-none pr-12"
+                />
+                {isSupported && (
+                  <button
+                    onClick={handleMicToggle}
+                    className={`absolute right-3 bottom-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                      isListening
+                        ? 'bg-red-500 text-[var(--text)] animate-pulse'
+                        : 'bg-[var(--bg-deep)] text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleSaveNewNote}
+                disabled={savingNew || !newNote.trim()}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-[var(--text)] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors text-sm"
+              >
+                {savingNew ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Save Note
+                  </>
+                )}
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <span className="text-emerald-400 font-semibold text-sm">
+                  {metInteractions.length > 1
+                    ? `Met by ${metInteractions.length} people`
+                    : 'You met them'}
+                </span>
+              </div>
+              <button
+                onClick={() => setAddingNote(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--bg-deep)] transition-colors text-sm text-[var(--text-secondary)] font-medium flex-shrink-0"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Add note
+              </button>
+            </div>
+          )
         ) : (
           <div className="space-y-3">
             <div className="relative">
