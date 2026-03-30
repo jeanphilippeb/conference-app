@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
   ArrowLeft,
@@ -45,7 +45,10 @@ function InteractionItem({
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(interaction.notes || '')
   const [saving, setSaving] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [swiped, setSwiped] = useState(false)
+  const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
+  const rowRef = useRef<HTMLDivElement>(null)
 
   const profile = interaction.profile
   const name = profile?.name || 'Unknown'
@@ -61,6 +64,39 @@ function InteractionItem({
     no_show: 'No show',
   }
 
+  useEffect(() => {
+    if (isEditing) setSwiped(false)
+  }, [isEditing])
+
+  // Close swipe when tapping elsewhere
+  useEffect(() => {
+    if (!swiped) return
+    const handler = (e: TouchEvent | MouseEvent) => {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
+        setSwiped(false)
+      }
+    }
+    document.addEventListener('touchstart', handler)
+    document.addEventListener('mousedown', handler)
+    return () => {
+      document.removeEventListener('touchstart', handler)
+      document.removeEventListener('mousedown', handler)
+    }
+  }, [swiped])
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current)
+    if (dy > 20) return // vertical scroll, ignore
+    if (dx < -50) setSwiped(true)
+    else if (dx > 20) setSwiped(false)
+  }
+
   const handleSave = async () => {
     if (!onEditSave) return
     setSaving(true)
@@ -74,18 +110,51 @@ function InteractionItem({
     }
   }
 
+  const ACTIONS_WIDTH = 88 // px — two 44px buttons
+
   return (
-    <div className="flex gap-3 py-3">
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${colorClass}`}>
-        {profile?.avatar_url ? (
-          <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
-        ) : (
-          <span className="text-[var(--text)] text-xs font-bold">{initials}</span>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start gap-1">
-          <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+    <div ref={rowRef} className="relative overflow-hidden">
+      {/* Swipe action buttons — revealed on swipe left */}
+      {isOwn && (
+        <div
+          className="absolute right-0 top-0 bottom-0 flex"
+          style={{ width: ACTIONS_WIDTH }}
+        >
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={() => { setSwiped(false); setIsEditing(true); setEditText(interaction.notes || '') }}
+            className="flex-1 flex flex-col items-center justify-center gap-1 bg-blue-600 text-white text-[10px] font-medium"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit
+          </button>
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={() => { setSwiped(false); onDelete?.() }}
+            className="flex-1 flex flex-col items-center justify-center gap-1 bg-red-500 text-white text-[10px] font-medium"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      )}
+
+      {/* Row content — slides left on swipe */}
+      <div
+        className="flex gap-3 py-3 bg-[var(--bg-elevated)] transition-transform duration-200"
+        style={{ transform: swiped ? `translateX(-${ACTIONS_WIDTH}px)` : 'translateX(0)' }}
+        onTouchStart={isOwn && !isEditing ? handleTouchStart : undefined}
+        onTouchEnd={isOwn && !isEditing ? handleTouchEnd : undefined}
+      >
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${colorClass}`}>
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
+          ) : (
+            <span className="text-[var(--text)] text-xs font-bold">{initials}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[var(--text)] text-sm font-medium">{name}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
               interaction.status === 'met'
@@ -101,75 +170,43 @@ function InteractionItem({
             )}
             <span className="text-[var(--text-muted)] text-xs">{timeAgo}</span>
           </div>
-          {isOwn && !isEditing && !confirmDelete && (
-            <div className="flex gap-0.5 flex-shrink-0 mt-0.5">
-              <button
-                onClick={() => { setIsEditing(true); setEditText(interaction.notes || '') }}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-deep)] transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-red-400 hover:bg-[var(--bg-deep)] transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+
+          {isEditing ? (
+            <div className="mt-2">
+              <textarea
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                autoFocus
+                rows={3}
+                className="w-full bg-[var(--bg)] border border-blue-500 rounded-xl px-3 py-2 text-sm text-[var(--text)] resize-none outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <div className="flex gap-2 mt-1.5">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-xs text-white font-medium transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-1.5 bg-[var(--bg-deep)] rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          )}
-          {confirmDelete && (
-            <div className="flex gap-1.5 flex-shrink-0 items-center mt-0.5">
-              <button
-                onClick={onDelete}
-                className="px-2 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-medium rounded-lg hover:bg-red-500/30 transition-colors"
-              >
-                Delete
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="px-2 py-0.5 bg-[var(--bg-deep)] text-[var(--text-muted)] text-xs rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+          ) : (
+            <>
+              {interaction.notes && (
+                <p className="text-[var(--text-secondary)] text-sm mt-1 leading-relaxed">{interaction.notes}</p>
+              )}
+              {interaction.follow_up && (
+                <p className="text-blue-400 text-xs mt-1">Follow-up: {interaction.follow_up}</p>
+              )}
+            </>
           )}
         </div>
-
-        {isEditing ? (
-          <div className="mt-2">
-            <textarea
-              value={editText}
-              onChange={e => setEditText(e.target.value)}
-              autoFocus
-              rows={3}
-              className="w-full bg-[var(--bg)] border border-blue-500 rounded-xl px-3 py-2 text-sm text-[var(--text)] resize-none outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <div className="flex gap-2 mt-1.5">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-xs text-white font-medium transition-colors"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-1.5 bg-[var(--bg-deep)] rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {interaction.notes && (
-              <p className="text-[var(--text-secondary)] text-sm mt-1 leading-relaxed">{interaction.notes}</p>
-            )}
-            {interaction.follow_up && (
-              <p className="text-blue-400 text-xs mt-1">Follow-up: {interaction.follow_up}</p>
-            )}
-          </>
-        )}
       </div>
     </div>
   )
