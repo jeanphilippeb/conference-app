@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
   ArrowLeft,
@@ -11,9 +11,13 @@ import {
   X,
   BarChart2,
   Plus,
+  MessageSquare,
+  UserCheck,
+  UserX,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
+import { useGame } from '@/context/GameContext'
 import { useGameSheet } from '@/context/GameSheetContext'
 import { GameHeaderButton } from '@/components/GameHeaderButton'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -36,10 +40,18 @@ interface ConferenceInfo {
   end_date: string
 }
 
-function TargetRow({ target, currentUserId, onClick }: {
+const LEFT_ACTION_WIDTH = 80  // "Add Note" button width
+const RIGHT_ACTION_WIDTH = 80 // "Met/Unmet" button width
+
+function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkUnmet, onAddNote, swipedId, setSwipedId }: {
   target: Target
   currentUserId: string | undefined
   onClick: () => void
+  onMarkMet: (target: Target) => void
+  onMarkUnmet: (target: Target) => void
+  onAddNote: (target: Target) => void
+  swipedId: string | null
+  setSwipedId: (id: string | null) => void
 }) {
   const initials = getInitials(target.first_name, target.last_name)
   const colorClass = getInitialsColorClass(`${target.first_name} ${target.last_name}`)
@@ -51,66 +63,162 @@ function TargetRow({ target, currentUserId, onClick }: {
     ? metInteractions.some(i => i.user_id === currentUserId)
     : false
 
+  const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
+  const [offsetX, setOffsetX] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const rowRef = useRef<HTMLDivElement>(null)
+
+  // Determine the current "snapped" state based on swipedId
+  // 'left' = swiped left (shows right action = met/unmet)
+  // 'right' = swiped right (shows left action = add note)
+  const swipeDir = swipedId === `${target.id}-left` ? 'left' : swipedId === `${target.id}-right` ? 'right' : null
+
+  const snappedX = swipeDir === 'left' ? -RIGHT_ACTION_WIDTH : swipeDir === 'right' ? LEFT_ACTION_WIDTH : 0
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+    setIsDragging(true)
+    setOffsetX(0)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return
+    const dx = e.touches[0].clientX - touchStartX.current
+    const dy = Math.abs(e.touches[0].clientY - touchStartY.current)
+    if (dy > 30) { setIsDragging(false); setOffsetX(0); return }
+    // Clamp: allow left swipe (negative) up to -RIGHT_ACTION_WIDTH, right swipe (positive) up to LEFT_ACTION_WIDTH
+    const clamped = Math.max(-RIGHT_ACTION_WIDTH * 1.2, Math.min(LEFT_ACTION_WIDTH * 1.2, dx + snappedX))
+    setOffsetX(clamped)
+  }
+
+  const handleTouchEnd = () => {
+    if (!isDragging) { setOffsetX(0); return }
+    setIsDragging(false)
+    const threshold = 40
+    if (offsetX < -threshold) {
+      // Swiped left → show met/unmet action
+      setSwipedId(`${target.id}-left`)
+    } else if (offsetX > threshold) {
+      // Swiped right → show add note action
+      setSwipedId(`${target.id}-right`)
+    } else {
+      setSwipedId(null)
+    }
+    setOffsetX(0)
+  }
+
+  const displayX = isDragging ? offsetX : snappedX
+
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-elevated)]/50 active:bg-[var(--bg-elevated)] transition-colors"
-    >
-      {/* Avatar */}
-      <div className={`relative w-11 h-11 rounded-full flex-shrink-0 overflow-hidden ${colorClass}`}>
-        {target.photo_url ? (
-          <img
-            src={target.photo_url}
-            alt={`${target.first_name} ${target.last_name}`}
-            className="w-full h-full object-cover"
-          />
+    <div ref={rowRef} className="relative overflow-hidden">
+      {/* Left action (revealed by right swipe): Add Note */}
+      <div
+        className="absolute inset-y-0 left-0 flex items-center"
+        style={{ width: LEFT_ACTION_WIDTH }}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); setSwipedId(null); onAddNote(target) }}
+          className="w-full h-full flex flex-col items-center justify-center gap-1 bg-blue-600 text-white active:bg-blue-700 transition-colors"
+        >
+          <MessageSquare className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Note</span>
+        </button>
+      </div>
+
+      {/* Right action (revealed by left swipe): Mark Met / Unmet */}
+      <div
+        className="absolute inset-y-0 right-0 flex items-center"
+        style={{ width: RIGHT_ACTION_WIDTH }}
+      >
+        {isMetByCurrentUser ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setSwipedId(null); onMarkUnmet(target) }}
+            className="w-full h-full flex flex-col items-center justify-center gap-1 bg-orange-600 text-white active:bg-orange-700 transition-colors"
+          >
+            <UserX className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Unmet</span>
+          </button>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-[var(--text)] font-bold text-sm">{initials}</span>
-          </div>
-        )}
-        {isMetByCurrentUser && (
-          <div className="absolute inset-0 bg-emerald-500/30 flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-emerald-300" />
-          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setSwipedId(null); onMarkMet(target) }}
+            className="w-full h-full flex flex-col items-center justify-center gap-1 bg-emerald-600 text-white active:bg-emerald-700 transition-colors"
+          >
+            <UserCheck className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Met</span>
+          </button>
         )}
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0 text-left">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
-          <span className="text-[var(--text)] font-medium text-sm truncate">
-            {target.first_name} {target.last_name}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[var(--text-secondary)] text-xs truncate">{target.company}</span>
-          {target.role && (
-            <>
-              <span className="text-[var(--text-muted)] text-xs">·</span>
-              <span className="text-[var(--text-muted)] text-xs truncate">{target.role}</span>
-            </>
+      {/* Sliding row content */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={() => { if (swipeDir) { setSwipedId(null) } else { onClick() } }}
+        className="relative bg-[var(--bg)] flex items-center gap-3 px-4 py-3 active:bg-[var(--bg-elevated)] transition-colors"
+        style={{
+          transform: `translateX(${displayX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+        }}
+      >
+        {/* Avatar */}
+        <div className={`relative w-11 h-11 rounded-full flex-shrink-0 overflow-hidden ${colorClass}`}>
+          {target.photo_url ? (
+            <img
+              src={target.photo_url}
+              alt={`${target.first_name} ${target.last_name}`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-[var(--text)] font-bold text-sm">{initials}</span>
+            </div>
           )}
-          {target.booth_number && (
-            <>
-              <span className="text-[var(--text-muted)] text-xs">·</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-deep)] text-[var(--text-secondary)] font-medium flex-shrink-0">#{target.booth_number}</span>
-            </>
+          {isMetByCurrentUser && (
+            <div className="absolute inset-0 bg-emerald-500/30 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Met indicator */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {isMetByAnyone && (
-          <span className="text-xs text-emerald-400 font-medium">
-            {metInteractions.length > 1 ? `${metInteractions.length}×` : '✓'}
-          </span>
-        )}
-        <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+        {/* Info */}
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
+            <span className="text-[var(--text)] font-medium text-sm truncate">
+              {target.first_name} {target.last_name}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[var(--text-secondary)] text-xs truncate">{target.company}</span>
+            {target.role && (
+              <>
+                <span className="text-[var(--text-muted)] text-xs">·</span>
+                <span className="text-[var(--text-muted)] text-xs truncate">{target.role}</span>
+              </>
+            )}
+            {target.booth_number && (
+              <>
+                <span className="text-[var(--text-muted)] text-xs">·</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-deep)] text-[var(--text-secondary)] font-medium flex-shrink-0">#{target.booth_number}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Met indicator */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isMetByAnyone && (
+            <span className="text-xs text-emerald-400 font-medium">
+              {metInteractions.length > 1 ? `${metInteractions.length}×` : '✓'}
+            </span>
+          )}
+          <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+        </div>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -118,9 +226,65 @@ export function ListView() {
   const { conferenceId } = useParams<{ conferenceId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, loading } = useTargets(conferenceId)
+  const { targets, loading, createInteraction, deleteInteraction } = useTargets(conferenceId)
+  const { triggerMet } = useGame()
   const [conference, setConference] = useState<ConferenceInfo | null>(null)
   const { setContext } = useGameSheet()
+
+  // Swipe state
+  const [swipedId, setSwipedId] = useState<string | null>(null)
+
+  // Note modal state
+  const [noteTarget, setNoteTarget] = useState<Target | null>(null)
+  const [noteText, setNoteText] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const noteInputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Close swipe on scroll
+  const handleListScroll = useCallback(() => {
+    if (swipedId) setSwipedId(null)
+  }, [swipedId])
+
+  const handleMarkMet = useCallback(async (target: Target) => {
+    try {
+      const { pts } = await triggerMet(target.priority)
+      await createInteraction(target.id, '', 'met', pts)
+    } catch (err) {
+      console.error('Failed to mark as met:', err)
+    }
+  }, [triggerMet, createInteraction])
+
+  const handleMarkUnmet = useCallback(async (target: Target) => {
+    if (!user?.id) return
+    const userInteractions = (target.interactions || []).filter(i => i.user_id === user.id)
+    try {
+      for (const interaction of userInteractions) {
+        await deleteInteraction(interaction.id)
+      }
+    } catch (err) {
+      console.error('Failed to mark as unmet:', err)
+    }
+  }, [user?.id, deleteInteraction])
+
+  const handleAddNote = useCallback((target: Target) => {
+    setNoteTarget(target)
+    setNoteText('')
+    setTimeout(() => noteInputRef.current?.focus(), 100)
+  }, [])
+
+  const handleSaveNote = useCallback(async () => {
+    if (!noteTarget || !noteText.trim()) return
+    setNoteSaving(true)
+    try {
+      await createInteraction(noteTarget.id, noteText.trim(), 'met', 0)
+      setNoteTarget(null)
+      setNoteText('')
+    } catch (err) {
+      console.error('Failed to save note:', err)
+    } finally {
+      setNoteSaving(false)
+    }
+  }, [noteTarget, noteText, createInteraction])
 
   useEffect(() => {
     if (!conferenceId) return
@@ -357,13 +521,18 @@ export function ListView() {
         </div>
       ) : (
         <>
-          <div className="divide-y divide-[var(--divider)]">
+          <div className="divide-y divide-[var(--divider)]" onScroll={handleListScroll}>
             {filteredSortedTargets.map((target) => (
-              <TargetRow
+              <SwipeableTargetRow
                 key={target.id}
                 target={target}
                 currentUserId={user?.id}
                 onClick={() => navigate(`/conference/${conferenceId}/target/${target.id}`)}
+                onMarkMet={handleMarkMet}
+                onMarkUnmet={handleMarkUnmet}
+                onAddNote={handleAddNote}
+                swipedId={swipedId}
+                setSwipedId={setSwipedId}
               />
             ))}
           </div>
@@ -371,6 +540,38 @@ export function ListView() {
             {filteredSortedTargets.length} result{filteredSortedTargets.length !== 1 ? 's' : ''}
           </p>
         </>
+      )}
+
+      {/* Note input modal */}
+      {noteTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setNoteTarget(null)} />
+          <div className="relative w-full max-w-lg bg-[var(--bg-elevated)] rounded-t-2xl p-4 pb-8 animate-slide-up">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[var(--text)] font-semibold text-sm">
+                Note pour {noteTarget.first_name} {noteTarget.last_name}
+              </h3>
+              <button onClick={() => setNoteTarget(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-deep)]">
+                <X className="w-4 h-4 text-[var(--text-secondary)]" />
+              </button>
+            </div>
+            <textarea
+              ref={noteInputRef}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Ajouter une note..."
+              rows={3}
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm resize-none"
+            />
+            <button
+              onClick={handleSaveNote}
+              disabled={!noteText.trim() || noteSaving}
+              className="mt-3 w-full py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm disabled:opacity-40 active:bg-blue-700 transition-colors"
+            >
+              {noteSaving ? 'Saving...' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Add target button */}
