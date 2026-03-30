@@ -15,6 +15,7 @@ import {
   Pencil,
   Trash2,
   X,
+  MoreHorizontal,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
@@ -154,21 +155,31 @@ function InteractionItem({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[var(--text)] text-sm font-medium">{name}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              interaction.status === 'met'
-                ? 'bg-emerald-500/20 text-emerald-400'
-                : 'bg-[var(--bg-deep)] text-[var(--text-secondary)]'
-            }`}>
-              {statusLabel[interaction.status] || interaction.status}
-            </span>
-            {interaction.score != null && interaction.score > 0 && (
-              <span className="text-xs font-bold" style={{ color: '#FBBF24' }}>
-                +{interaction.score}
+          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+              <span className="text-[var(--text)] text-sm font-medium">{name}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                interaction.status === 'met'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-[var(--bg-deep)] text-[var(--text-secondary)]'
+              }`}>
+                {statusLabel[interaction.status] || interaction.status}
               </span>
+              {interaction.score != null && interaction.score > 0 && (
+                <span className="text-xs font-bold" style={{ color: '#FBBF24' }}>
+                  +{interaction.score}
+                </span>
+              )}
+              <span className="text-[var(--text-muted)] text-xs">{timeAgo}</span>
+            </div>
+            {isOwn && !isEditing && (
+              <button
+                onClick={() => setSwiped(s => !s)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
             )}
-            <span className="text-[var(--text-muted)] text-xs">{timeAgo}</span>
           </div>
 
           {isEditing ? (
@@ -597,6 +608,55 @@ export function CardView() {
               </button>
             </div>
           )
+        ) : addingNote ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">New meeting note</span>
+              <button
+                onClick={() => { setAddingNote(false); setNewNote(''); stopListening(); }}
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="relative">
+              <textarea
+                ref={newNoteRef}
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="What did you talk about?"
+                rows={3}
+                autoFocus
+                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm resize-none pr-12"
+              />
+              {isSupported && (
+                <button
+                  onClick={handleMicToggle}
+                  className={`absolute right-3 bottom-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                    isListening
+                      ? 'bg-red-500 text-[var(--text)] animate-pulse'
+                      : 'bg-[var(--bg-deep)] text-[var(--text-secondary)]'
+                  }`}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
+            <button
+              onClick={handleSaveNewNote}
+              disabled={savingNew || !newNote.trim()}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-[var(--text)] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors text-sm"
+            >
+              {savingNew ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  Save Note
+                </>
+              )}
+            </button>
+          </div>
         ) : (
           <div className="space-y-3">
             <div className="relative">
@@ -618,24 +678,33 @@ export function CardView() {
                 </button>
               )}
             </div>
-            <button
-              onClick={handleMarkMet}
-              disabled={markingMet}
-              className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-[var(--text)] transition-all text-base ${
-                isMetByAnyone
-                  ? 'bg-emerald-700 hover:bg-emerald-600'
-                  : 'bg-emerald-600 hover:bg-emerald-500 shadow-xl shadow-emerald-900/40'
-              } disabled:opacity-50`}
-            >
-              {markingMet ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <User className="w-5 h-5" />
-                  {isMetByAnyone ? 'I Also Met Them' : 'I Met Them'}
-                </>
-              )}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleMarkMet}
+                disabled={markingMet}
+                className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-[var(--text)] transition-all text-base ${
+                  isMetByAnyone
+                    ? 'bg-emerald-700 hover:bg-emerald-600'
+                    : 'bg-emerald-600 hover:bg-emerald-500 shadow-xl shadow-emerald-900/40'
+                } disabled:opacity-50`}
+              >
+                {markingMet ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <User className="w-5 h-5" />
+                    {isMetByAnyone ? 'I Also Met Them' : 'I Met Them'}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setAddingNote(true)}
+                className="flex items-center gap-1.5 px-3 py-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--bg-deep)] transition-colors text-sm text-[var(--text-secondary)] font-medium flex-shrink-0"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Note
+              </button>
+            </div>
           </div>
         )}
       </div>
