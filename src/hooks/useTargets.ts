@@ -113,6 +113,16 @@ export function useTargets(conferenceId: string | undefined) {
     return data as Interaction
   }
 
+  const deleteInteraction = async (interactionId: string) => {
+    const { error } = await supabase
+      .from('conference_interactions')
+      .delete()
+      .eq('id', interactionId)
+
+    if (error) throw error
+    await fetchTargets()
+  }
+
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
     const { error } = await supabase
       .from('conference_interactions')
@@ -120,7 +130,25 @@ export function useTargets(conferenceId: string | undefined) {
       .eq('id', interactionId)
 
     if (error) throw error
-    await fetchTargets()
+
+    // Update in-place in the cache and state — no full refetch needed
+    const updateInCache = (list: Target[]) =>
+      list.map(t => ({
+        ...t,
+        interactions: (t.interactions || []).map(i =>
+          i.id === interactionId ? { ...i, notes } : i
+        ),
+        latest_interaction:
+          t.latest_interaction?.id === interactionId
+            ? { ...t.latest_interaction, notes }
+            : t.latest_interaction,
+      }))
+
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, updateInCache(cached))
+    }
+    setTargets(prev => updateInCache(prev))
   }
 
   return {
@@ -130,5 +158,6 @@ export function useTargets(conferenceId: string | undefined) {
     refetch: fetchTargets,
     createInteraction,
     updateInteractionNotes,
+    deleteInteraction,
   }
 }
