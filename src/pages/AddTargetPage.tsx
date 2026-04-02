@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { ArrowLeft, Save, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/context/AuthContext'
-import { Priority } from '@/lib/types'
+import { Priority, CompanyStatus } from '@/lib/types'
 import { clearTargetsCache } from '@/hooks/useTargets'
 
 const PRIORITY_OPTIONS: { value: Priority; label: string; description: string }[] = [
@@ -12,10 +12,18 @@ const PRIORITY_OPTIONS: { value: Priority; label: string; description: string }[
   { value: 'nice_to_have', label: 'Nice to Have', description: 'Would be good to connect' },
 ]
 
+const COMPANY_STATUS_OPTIONS: { value: CompanyStatus; label: string }[] = [
+  { value: 'new_suspect', label: 'New suspect' },
+  { value: 'active_lead', label: 'Active lead' },
+  { value: 'prospect', label: 'Prospect' },
+  { value: 'customer', label: 'Customer' },
+]
+
 interface FormData {
   first_name: string
   last_name: string
   company: string
+  company_status: CompanyStatus | ''
   role: string
   booth_number: string
   priority: Priority
@@ -31,6 +39,7 @@ const DEFAULT_FORM: FormData = {
   first_name: '',
   last_name: '',
   company: '',
+  company_status: '',
   role: '',
   booth_number: '',
   priority: 'should_meet',
@@ -79,6 +88,7 @@ export function AddTargetPage() {
             first_name: data.first_name || '',
             last_name: data.last_name || '',
             company: data.company || '',
+            company_status: data.company_status || '',
             role: data.role || '',
             booth_number: data.booth_number || '',
             priority: data.priority || 'should_meet',
@@ -145,6 +155,7 @@ export function AddTargetPage() {
         first_name: form.first_name,
         last_name: form.last_name,
         company: form.company,
+        company_status: form.company_status || null,
         role: form.role || null,
         booth_number: form.booth_number || null,
         priority: form.priority,
@@ -250,6 +261,21 @@ export function AddTargetPage() {
             className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
             required
           />
+        </div>
+
+        {/* Company Status */}
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Company Status</label>
+          <select
+            value={form.company_status}
+            onChange={(e) => handleChange('company_status', e.target.value)}
+            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-colors text-sm"
+          >
+            <option value="">— None —</option>
+            {COMPANY_STATUS_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Role + Booth */}

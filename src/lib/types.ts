@@ -1,6 +1,7 @@
 export type Priority = 'must_meet' | 'should_meet' | 'nice_to_have';
 export type ConferenceStatus = 'upcoming' | 'active' | 'completed';
 export type InteractionStatus = 'met' | 'attempted' | 'no_show';
+export type CompanyStatus = 'new_suspect' | 'active_lead' | 'prospect' | 'customer';
 
 export interface Profile {
   id: string;
@@ -38,6 +39,7 @@ export interface Target {
   linkedin_url?: string;
   booth_number?: string;
   priority: Priority;
+  company_status?: CompanyStatus;
   pre_notes?: string;
   tags?: string[];
   added_by?: string;

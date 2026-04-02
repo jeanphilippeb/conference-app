@@ -28,9 +28,26 @@ import {
   getPriorityBadgeClasses,
 } from '@/lib/helpers'
 import { calculateScore } from '@/lib/scoring'
-import { Target, Interaction } from '@/lib/types'
+import { Target, Interaction, CompanyStatus } from '@/lib/types'
 import { PointsFloater } from '@/components/PointsFloater'
 import { formatDistanceToNow, parseISO } from 'date-fns'
+
+const COMPANY_STATUS_CONFIG: Record<CompanyStatus, { label: string; className: string }> = {
+  new_suspect: { label: 'New suspect', className: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
+  active_lead:  { label: 'Active lead',  className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  prospect:     { label: 'Prospect',     className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  customer:     { label: 'Customer',     className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+}
+
+function CompanyStatusBadge({ status }: { status: CompanyStatus }) {
+  const config = COMPANY_STATUS_CONFIG[status]
+  if (!config) return null
+  return (
+    <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${config.className}`}>
+      {config.label}
+    </span>
+  )
+}
 
 function InteractionItem({
   interaction,
@@ -40,12 +57,13 @@ function InteractionItem({
 }: {
   interaction: Interaction
   isOwn?: boolean
-  onDelete?: () => void
+  onDelete?: () => Promise<void>
   onEditSave?: (notes: string) => Promise<void>
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(interaction.notes || '')
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [swiped, setSwiped] = useState(false)
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
@@ -131,11 +149,19 @@ function InteractionItem({
           </button>
           <button
             onPointerDown={e => e.stopPropagation()}
-            onClick={() => { setSwiped(false); onDelete?.() }}
-            className="flex-1 flex flex-col items-center justify-center gap-1 bg-red-500 text-white text-[10px] font-medium"
+            disabled={deleting}
+            onClick={async () => {
+              setSwiped(false)
+              setDeleting(true)
+              try { await onDelete?.() } catch { /* silent */ } finally { setDeleting(false) }
+            }}
+            className="flex-1 flex flex-col items-center justify-center gap-1 bg-red-500 text-white text-[10px] font-medium disabled:opacity-60"
           >
-            <Trash2 className="w-4 h-4" />
-            Delete
+            {deleting
+              ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <Trash2 className="w-4 h-4" />
+            }
+            {deleting ? '' : 'Delete'}
           </button>
         </div>
       )}
@@ -227,17 +253,17 @@ export function CardView() {
   const { conferenceId, targetId } = useParams<{ conferenceId: string; targetId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, loading: targetsLoading, createInteraction, updateInteractionNotes, deleteInteraction } = useTargets(conferenceId)
+  const { targets, loading: targetsLoading, createInteraction, updateInteractionNotes, deleteInteraction, deleteInteractions } = useTargets(conferenceId)
   const { triggerMet, triggerNote, getStreakMultiplier } = useGame()
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText()
 
-  const [preNote, setPreNote] = useState('')
   const [markingMet, setMarkingMet] = useState(false)
   const [floatingPts, setFloatingPts] = useState<number | null>(null)
   const [addingNote, setAddingNote] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [savingNew, setSavingNew] = useState(false)
   const [confirmUnmet, setConfirmUnmet] = useState(false)
+  const [markingUnmet, setMarkingUnmet] = useState(false)
   const newNoteRef = useRef<HTMLTextAreaElement>(null)
 
   const target: Target | undefined = targets.find(t => t.id === targetId)
@@ -254,9 +280,8 @@ export function CardView() {
     setMarkingMet(true)
     try {
       const { pts } = await triggerMet(target.priority)
-      await createInteraction(targetId, preNote, 'met', pts)
+      await createInteraction(targetId, '', 'met', pts)
       setFloatingPts(pts)
-      setPreNote('')
     } catch (err) {
       console.error(err)
     } finally {
@@ -268,7 +293,14 @@ export function CardView() {
     if (!targetId || !target || !newNote.trim()) return
     setSavingNew(true)
     try {
-      await createInteraction(targetId, newNote.trim(), 'met', 0)
+      // If user wasn't met yet, award met points (same as "I Met Them" flow)
+      let score = 0
+      if (!isMetByCurrentUser) {
+        const { pts } = await triggerMet(target.priority)
+        score = pts
+        setFloatingPts(pts)
+      }
+      await createInteraction(targetId, newNote.trim(), 'met', score)
       setNewNote('')
       setAddingNote(false)
     } catch (err) {
@@ -279,14 +311,15 @@ export function CardView() {
   }
 
   const handleMarkUnmet = async () => {
-    if (!targetId || !user?.id) return
+    if (!targetId || !user?.id || myInteractions.length === 0) return
+    setMarkingUnmet(true)
     try {
-      for (const interaction of myInteractions) {
-        await deleteInteraction(interaction.id)
-      }
+      await deleteInteractions(myInteractions.map(i => i.id))
       setConfirmUnmet(false)
     } catch (err) {
       console.error(err)
+    } finally {
+      setMarkingUnmet(false)
     }
   }
 
@@ -310,8 +343,6 @@ export function CardView() {
       startListening((text) => {
         if (addingNote) {
           setNewNote(prev => prev ? `${prev} ${text}` : text)
-        } else {
-          setPreNote(prev => prev ? `${prev} ${text}` : text)
         }
       })
       if (addingNote) newNoteRef.current?.focus()
@@ -404,7 +435,12 @@ export function CardView() {
             </span>
           </div>
           {target.company && (
-            <p className="text-[var(--text-secondary)] text-base mt-0.5">{target.company}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="text-[var(--text-secondary)] text-base">{target.company}</p>
+              {target.company_status && (
+                <CompanyStatusBadge status={target.company_status} />
+              )}
+            </div>
           )}
           <div className="flex items-center gap-2 mt-0.5">
             {target.role && (
@@ -570,9 +606,13 @@ export function CardView() {
               <div className="flex gap-3">
                 <button
                   onClick={handleMarkUnmet}
-                  className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 font-semibold text-sm hover:bg-red-500/30 transition-colors"
+                  disabled={markingUnmet}
+                  className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 font-semibold text-sm hover:bg-red-500/30 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
-                  Yes, mark as unmet
+                  {markingUnmet
+                    ? <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                    : 'Yes, mark as unmet'
+                  }
                 </button>
                 <button
                   onClick={() => setConfirmUnmet(false)}
@@ -658,27 +698,7 @@ export function CardView() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="relative">
-              <input
-                type="text"
-                value={preNote}
-                onChange={(e) => setPreNote(e.target.value)}
-                placeholder="Quick note (optional)..."
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm pr-12"
-              />
-              {isSupported && (
-                <button
-                  onClick={handleMicToggle}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
-                    isListening ? 'bg-red-500 text-[var(--text)] animate-pulse' : 'bg-[var(--bg-deep)] text-[var(--text-secondary)]'
-                  }`}
-                >
-                  {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
+          <div className="flex gap-2">
               <button
                 onClick={handleMarkMet}
                 disabled={markingMet}
@@ -704,7 +724,6 @@ export function CardView() {
                 <MessageSquare className="w-4 h-4" />
                 Note
               </button>
-            </div>
           </div>
         )}
       </div>
