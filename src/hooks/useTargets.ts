@@ -123,6 +123,18 @@ export function useTargets(conferenceId: string | undefined) {
     await fetchTargets()
   }
 
+  // Delete multiple interactions in parallel then refetch once
+  const deleteInteractions = async (interactionIds: string[]) => {
+    await Promise.all(
+      interactionIds.map(id =>
+        supabase.from('conference_interactions').delete().eq('id', id).then(({ error }) => {
+          if (error) throw error
+        })
+      )
+    )
+    await fetchTargets()
+  }
+
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
     const { error } = await supabase
       .from('conference_interactions')
@@ -159,5 +171,6 @@ export function useTargets(conferenceId: string | undefined) {
     createInteraction,
     updateInteractionNotes,
     deleteInteraction,
+    deleteInteractions,
   }
 }
