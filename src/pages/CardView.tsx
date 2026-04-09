@@ -16,6 +16,7 @@ import {
   Trash2,
   X,
   MoreHorizontal,
+  PhoneCall,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
@@ -253,7 +254,7 @@ export function CardView() {
   const { conferenceId, targetId } = useParams<{ conferenceId: string; targetId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, loading: targetsLoading, createInteraction, updateInteractionNotes, deleteInteraction, deleteInteractions } = useTargets(conferenceId)
+  const { targets, loading: targetsLoading, createInteraction, updateInteractionNotes, deleteInteraction, deleteInteractions, toggleContacted } = useTargets(conferenceId)
   const { triggerMet, triggerNote, getStreakMultiplier } = useGame()
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText()
 
@@ -506,6 +507,19 @@ export function CardView() {
             )}
           </div>
         )}
+
+        {/* Contacted toggle */}
+        <button
+          onClick={() => toggleContacted(target.id, !target.contacted)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium mb-4 transition-colors ${
+            target.contacted
+              ? 'bg-sky-500/15 border-sky-500/40 text-sky-400'
+              : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] hover:border-sky-500/40 hover:text-sky-400'
+          }`}
+        >
+          <PhoneCall className="w-4 h-4" />
+          {target.contacted ? 'Contacted' : 'Mark as Contacted'}
+        </button>
 
         {/* Pre-notes / Context */}
         {target.pre_notes && (

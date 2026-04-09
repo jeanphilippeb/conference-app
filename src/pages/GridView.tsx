@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   BarChart2,
   SlidersHorizontal,
+  Phone,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
@@ -22,7 +23,8 @@ import { coveragePercent, getInitials, getInitialsColorClass } from '@/lib/helpe
 import { Target, Priority } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 
-type FilterType = 'all' | Priority | 'met' | 'not_met'
+type PriorityFilter = 'all' | Priority
+type StatusFilter = 'all' | 'met' | 'not_met' | 'contacted'
 type SortKey = 'priority' | 'name' | 'company' | 'recent'
 
 interface ConferenceInfo {
@@ -68,7 +70,7 @@ function TargetTile({ target, currentUserId, onClick }: {
         />
       ) : (
         <div className={`absolute inset-0 flex items-center justify-center ${colorClass}`}>
-          <span className="text-[var(--text)] font-bold text-2xl">{initials}</span>
+          <span className="text-white font-bold text-2xl">{initials}</span>
         </div>
       )}
 
@@ -77,13 +79,19 @@ function TargetTile({ target, currentUserId, onClick }: {
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-      {isMetByCurrentUser && (
-        <div className="absolute top-2 right-2">
-          <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
-            <CheckCircle2 className="w-4 h-4 text-[var(--text)]" />
+      {/* Top badges */}
+      <div className="absolute top-2 left-2 right-2 flex items-start justify-between">
+        {target.contacted && (
+          <div className="w-5 h-5 rounded-full bg-sky-500/90 flex items-center justify-center shadow">
+            <Phone className="w-2.5 h-2.5 text-white" />
           </div>
-        </div>
-      )}
+        )}
+        {isMetByCurrentUser && (
+          <div className="ml-auto w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+            <CheckCircle2 className="w-4 h-4 text-white" />
+          </div>
+        )}
+      </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-2.5">
         {isMetByAnyone && metByUser && (
@@ -92,7 +100,7 @@ function TargetTile({ target, currentUserId, onClick }: {
               {metByUser.avatar_url ? (
                 <img src={metByUser.avatar_url} className="w-full h-full object-cover" alt="" />
               ) : (
-                <span className="text-[var(--text)] text-[8px] font-bold">
+                <span className="text-white text-[8px] font-bold">
                   {metByUser.name?.charAt(0) || '?'}
                 </span>
               )}
@@ -100,7 +108,7 @@ function TargetTile({ target, currentUserId, onClick }: {
           </div>
         )}
         <div className="flex items-center gap-1.5">
-          <p className="text-[var(--text)] font-semibold text-xs leading-tight truncate flex-1">
+          <p className="text-white font-semibold text-xs leading-tight truncate flex-1">
             {target.first_name} {target.last_name}
           </p>
           {target.booth_number && (
@@ -109,7 +117,7 @@ function TargetTile({ target, currentUserId, onClick }: {
             </span>
           )}
         </div>
-        <p className="text-[var(--text)]/60 text-[10px] leading-tight truncate">{target.company}</p>
+        <p className="text-white/70 text-[10px] leading-tight truncate">{target.company}</p>
       </div>
     </button>
   )
@@ -145,7 +153,9 @@ export function GridView() {
     return () => setContext(undefined)
   }, [conferenceId, setContext])
 
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [companyFilter, setCompanyFilter] = useState<string | null>(null)
   const [sort, setSort] = useState<SortKey>('priority')
   const [showSortMenu, setShowSortMenu] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -153,15 +163,28 @@ export function GridView() {
 
   useRealtimeSync(conferenceId, refetch)
 
+  const uniqueCompanies = useMemo(() => {
+    const companies = targets.map(t => t.company).filter(Boolean)
+    return [...new Set(companies)].sort((a, b) => a.localeCompare(b))
+  }, [targets])
+
   const filteredTargets = useMemo(() => {
     let list = targets
 
-    if (filter === 'must_meet' || filter === 'should_meet' || filter === 'nice_to_have') {
-      list = list.filter(t => t.priority === filter)
-    } else if (filter === 'met') {
+    if (priorityFilter !== 'all') {
+      list = list.filter(t => t.priority === priorityFilter)
+    }
+
+    if (statusFilter === 'met') {
       list = list.filter(t => (t.interactions || []).some(i => i.status === 'met'))
-    } else if (filter === 'not_met') {
+    } else if (statusFilter === 'not_met') {
       list = list.filter(t => !(t.interactions || []).some(i => i.status === 'met'))
+    } else if (statusFilter === 'contacted') {
+      list = list.filter(t => t.contacted)
+    }
+
+    if (companyFilter) {
+      list = list.filter(t => t.company === companyFilter)
     }
 
     if (searchQuery.trim()) {
@@ -190,7 +213,7 @@ export function GridView() {
           return 0
       }
     })
-  }, [targets, filter, sort, searchQuery])
+  }, [targets, priorityFilter, statusFilter, companyFilter, sort, searchQuery])
 
   const metCount = useMemo(() =>
     targets.filter(t => (t.interactions || []).some(i => i.status === 'met')).length,
@@ -206,13 +229,18 @@ export function GridView() {
   const totalCount = targets.length
   const pct = coveragePercent(metCount, totalCount)
 
-  const filters: { key: FilterType; label: string }[] = [
+  const priorityFilters: { key: PriorityFilter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'must_meet', label: 'Must Meet' },
     { key: 'should_meet', label: 'Should Meet' },
-    { key: 'nice_to_have', label: 'Nice to Meet' },
+    { key: 'nice_to_have', label: 'Nice to Have' },
+  ]
+
+  const statusFilters: { key: StatusFilter; label: string }[] = [
+    { key: 'all', label: 'Any Status' },
     { key: 'met', label: 'Met ✓' },
     { key: 'not_met', label: 'Not Met' },
+    { key: 'contacted', label: '📞 Contacted' },
   ]
 
   const sortLabels: Record<SortKey, string> = {
@@ -326,15 +354,15 @@ export function GridView() {
         {/* Streak banner */}
         <StreakBanner />
 
-        {/* Row 3: filter chips */}
-        <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto">
-          {filters.map((f) => (
+        {/* Priority filter chips */}
+        <div className="flex items-center gap-2 px-4 pt-1 pb-1 overflow-x-auto">
+          {priorityFilters.map((f) => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => setPriorityFilter(f.key)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filter === f.key
-                  ? 'bg-blue-600 text-[var(--text)]'
+                priorityFilter === f.key
+                  ? 'bg-blue-600 text-white'
                   : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-deep)]'
               }`}
             >
@@ -342,6 +370,52 @@ export function GridView() {
             </button>
           ))}
         </div>
+
+        {/* Status filter chips */}
+        <div className="flex items-center gap-2 px-4 pt-1 pb-2 overflow-x-auto">
+          {statusFilters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                statusFilter === f.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-deep)]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Company filter chips */}
+        {uniqueCompanies.length > 0 && (
+          <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto">
+            <button
+              onClick={() => setCompanyFilter(null)}
+              className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                companyFilter === null
+                  ? 'bg-slate-600 text-white'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-deep)]'
+              }`}
+            >
+              All Co.
+            </button>
+            {uniqueCompanies.map((company) => (
+              <button
+                key={company}
+                onClick={() => setCompanyFilter(companyFilter === company ? null : company)}
+                className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                  companyFilter === company
+                    ? 'bg-slate-600 text-white'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-deep)]'
+                }`}
+              >
+                {company}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Grid */}

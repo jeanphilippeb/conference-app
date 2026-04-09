@@ -42,6 +42,7 @@ export interface Target {
   company_status?: CompanyStatus;
   pre_notes?: string;
   tags?: string[];
+  contacted?: boolean;
   added_by?: string;
   created_at: string;
   // joined

@@ -14,6 +14,7 @@ import {
   MessageSquare,
   UserCheck,
   UserX,
+  Phone,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
@@ -32,7 +33,8 @@ import { Target, Priority } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 
 type SortKey = 'priority' | 'name' | 'company' | 'recent'
-type FilterType = 'all' | Priority | 'met' | 'not_met'
+type PriorityFilter = 'all' | Priority
+type StatusFilter = 'all' | 'met' | 'not_met' | 'contacted'
 
 interface ConferenceInfo {
   name: string
@@ -43,13 +45,14 @@ interface ConferenceInfo {
 const LEFT_ACTION_WIDTH = 80  // "Add Note" button width
 const RIGHT_ACTION_WIDTH = 80 // "Met/Unmet" button width
 
-function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkUnmet, onAddNote, swipedId, setSwipedId }: {
+function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkUnmet, onAddNote, onToggleContacted, swipedId, setSwipedId }: {
   target: Target
   currentUserId: string | undefined
   onClick: () => void
   onMarkMet: (target: Target) => void
   onMarkUnmet: (target: Target) => void
   onAddNote: (target: Target) => void
+  onToggleContacted: (target: Target) => void
   swipedId: string | null
   setSwipedId: (id: string | null) => void
 }) {
@@ -69,11 +72,7 @@ function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkU
   const [isDragging, setIsDragging] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
 
-  // Determine the current "snapped" state based on swipedId
-  // 'left' = swiped left (shows right action = met/unmet)
-  // 'right' = swiped right (shows left action = add note)
   const swipeDir = swipedId === `${target.id}-left` ? 'left' : swipedId === `${target.id}-right` ? 'right' : null
-
   const snappedX = swipeDir === 'left' ? -RIGHT_ACTION_WIDTH : swipeDir === 'right' ? LEFT_ACTION_WIDTH : 0
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -88,7 +87,6 @@ function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkU
     const dx = e.touches[0].clientX - touchStartX.current
     const dy = Math.abs(e.touches[0].clientY - touchStartY.current)
     if (dy > 30) { setIsDragging(false); setOffsetX(0); return }
-    // Clamp: allow left swipe (negative) up to -RIGHT_ACTION_WIDTH, right swipe (positive) up to LEFT_ACTION_WIDTH
     const clamped = Math.max(-RIGHT_ACTION_WIDTH * 1.2, Math.min(LEFT_ACTION_WIDTH * 1.2, dx + snappedX))
     setOffsetX(clamped)
   }
@@ -98,10 +96,8 @@ function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkU
     setIsDragging(false)
     const threshold = 40
     if (offsetX < -threshold) {
-      // Swiped left → show met/unmet action
       setSwipedId(`${target.id}-left`)
     } else if (offsetX > threshold) {
-      // Swiped right → show add note action
       setSwipedId(`${target.id}-right`)
     } else {
       setSwipedId(null)
@@ -173,7 +169,7 @@ function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkU
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-[var(--text)] font-bold text-sm">{initials}</span>
+              <span className="text-white font-bold text-sm">{initials}</span>
             </div>
           )}
           {isMetByCurrentUser && (
@@ -208,8 +204,20 @@ function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkU
           </div>
         </div>
 
-        {/* Met indicator */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Right indicators */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Contacted toggle */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleContacted(target) }}
+            className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
+              target.contacted
+                ? 'bg-sky-500/20 text-sky-400'
+                : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5" />
+          </button>
+
           {isMetByAnyone && (
             <span className="text-xs text-emerald-400 font-medium">
               {metInteractions.length > 1 ? `${metInteractions.length}×` : '✓'}
@@ -226,21 +234,18 @@ export function ListView() {
   const { conferenceId } = useParams<{ conferenceId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, loading, createInteraction, deleteInteraction } = useTargets(conferenceId)
+  const { targets, loading, createInteraction, deleteInteraction, toggleContacted } = useTargets(conferenceId)
   const { triggerMet } = useGame()
   const [conference, setConference] = useState<ConferenceInfo | null>(null)
   const { setContext } = useGameSheet()
 
-  // Swipe state
   const [swipedId, setSwipedId] = useState<string | null>(null)
 
-  // Note modal state
   const [noteTarget, setNoteTarget] = useState<Target | null>(null)
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Close swipe on scroll
   const handleListScroll = useCallback(() => {
     if (swipedId) setSwipedId(null)
   }, [swipedId])
@@ -271,6 +276,14 @@ export function ListView() {
     setNoteText('')
     setTimeout(() => noteInputRef.current?.focus(), 100)
   }, [])
+
+  const handleToggleContacted = useCallback(async (target: Target) => {
+    try {
+      await toggleContacted(target.id, !target.contacted)
+    } catch (err) {
+      console.error('Failed to toggle contacted:', err)
+    }
+  }, [toggleContacted])
 
   const handleSaveNote = useCallback(async () => {
     if (!noteTarget || !noteText.trim()) return
@@ -304,7 +317,9 @@ export function ListView() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [companyFilter, setCompanyFilter] = useState<string | null>(null)
   const [sort, setSort] = useState<SortKey>('priority')
   const [showSortMenu, setShowSortMenu] = useState(false)
 
@@ -321,13 +336,23 @@ export function ListView() {
     [targets]
   )
 
-  const filters: { key: FilterType; label: string }[] = [
+  const uniqueCompanies = useMemo(() => {
+    const companies = targets.map(t => t.company).filter(Boolean)
+    return [...new Set(companies)].sort((a, b) => a.localeCompare(b))
+  }, [targets])
+
+  const priorityFilters: { key: PriorityFilter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'must_meet', label: 'Must Meet' },
     { key: 'should_meet', label: 'Should Meet' },
-    { key: 'nice_to_have', label: 'Nice to Meet' },
+    { key: 'nice_to_have', label: 'Nice to Have' },
+  ]
+
+  const statusFilters: { key: StatusFilter; label: string }[] = [
+    { key: 'all', label: 'Any Status' },
     { key: 'met', label: 'Met ✓' },
     { key: 'not_met', label: 'Not Met' },
+    { key: 'contacted', label: '📞 Contacted' },
   ]
 
   const sortLabels: Record<SortKey, string> = {
@@ -340,12 +365,20 @@ export function ListView() {
   const filteredSortedTargets = useMemo(() => {
     let list = targets
 
-    if (filter === 'must_meet' || filter === 'should_meet' || filter === 'nice_to_have') {
-      list = list.filter(t => t.priority === filter)
-    } else if (filter === 'met') {
+    if (priorityFilter !== 'all') {
+      list = list.filter(t => t.priority === priorityFilter)
+    }
+
+    if (statusFilter === 'met') {
       list = list.filter(t => (t.interactions || []).some(i => i.status === 'met'))
-    } else if (filter === 'not_met') {
+    } else if (statusFilter === 'not_met') {
       list = list.filter(t => !(t.interactions || []).some(i => i.status === 'met'))
+    } else if (statusFilter === 'contacted') {
+      list = list.filter(t => t.contacted)
+    }
+
+    if (companyFilter) {
+      list = list.filter(t => t.company === companyFilter)
     }
 
     if (searchQuery.trim()) {
@@ -376,7 +409,7 @@ export function ListView() {
           return 0
       }
     })
-  }, [targets, filter, sort, searchQuery])
+  }, [targets, priorityFilter, statusFilter, companyFilter, sort, searchQuery])
 
   return (
     <div className="min-h-screen bg-[var(--bg)] pb-6">
@@ -482,15 +515,15 @@ export function ListView() {
         {/* Streak banner */}
         <StreakBanner />
 
-        {/* Row 3: filter chips */}
-        <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto">
-          {filters.map((f) => (
+        {/* Priority filter chips */}
+        <div className="flex items-center gap-2 px-4 pt-1 pb-1 overflow-x-auto">
+          {priorityFilters.map((f) => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => setPriorityFilter(f.key)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filter === f.key
-                  ? 'bg-blue-600 text-[var(--text)]'
+                priorityFilter === f.key
+                  ? 'bg-blue-600 text-white'
                   : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-deep)]'
               }`}
             >
@@ -498,6 +531,52 @@ export function ListView() {
             </button>
           ))}
         </div>
+
+        {/* Status filter chips */}
+        <div className="flex items-center gap-2 px-4 pt-1 pb-2 overflow-x-auto">
+          {statusFilters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                statusFilter === f.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-deep)]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Company filter chips */}
+        {uniqueCompanies.length > 0 && (
+          <div className="flex items-center gap-2 px-4 pb-3 overflow-x-auto">
+            <button
+              onClick={() => setCompanyFilter(null)}
+              className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                companyFilter === null
+                  ? 'bg-slate-600 text-white'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-deep)]'
+              }`}
+            >
+              All Co.
+            </button>
+            {uniqueCompanies.map((company) => (
+              <button
+                key={company}
+                onClick={() => setCompanyFilter(companyFilter === company ? null : company)}
+                className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                  companyFilter === company
+                    ? 'bg-slate-600 text-white'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-deep)]'
+                }`}
+              >
+                {company}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* List */}
@@ -531,6 +610,7 @@ export function ListView() {
                 onMarkMet={handleMarkMet}
                 onMarkUnmet={handleMarkUnmet}
                 onAddNote={handleAddNote}
+                onToggleContacted={handleToggleContacted}
                 swipedId={swipedId}
                 setSwipedId={setSwipedId}
               />

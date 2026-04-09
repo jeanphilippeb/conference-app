@@ -135,6 +135,24 @@ export function useTargets(conferenceId: string | undefined) {
     await fetchTargets()
   }
 
+  const toggleContacted = async (targetId: string, contacted: boolean) => {
+    const { error } = await supabase
+      .from('conference_targets')
+      .update({ contacted })
+      .eq('id', targetId)
+
+    if (error) throw error
+
+    const updateInCache = (list: Target[]) =>
+      list.map(t => t.id === targetId ? { ...t, contacted } : t)
+
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, updateInCache(cached))
+    }
+    setTargets(prev => updateInCache(prev))
+  }
+
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
     const { error } = await supabase
       .from('conference_interactions')
@@ -172,5 +190,6 @@ export function useTargets(conferenceId: string | undefined) {
     updateInteractionNotes,
     deleteInteraction,
     deleteInteractions,
+    toggleContacted,
   }
 }
