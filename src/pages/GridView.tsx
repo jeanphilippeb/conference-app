@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   BarChart2,
   SlidersHorizontal,
-  Phone,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
@@ -79,19 +78,13 @@ function TargetTile({ target, currentUserId, onClick }: {
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-      {/* Top badges */}
-      <div className="absolute top-2 left-2 right-2 flex items-start justify-between">
-        {target.contacted && (
-          <div className="w-5 h-5 rounded-full bg-sky-500/90 flex items-center justify-center shadow">
-            <Phone className="w-2.5 h-2.5 text-white" />
-          </div>
-        )}
-        {isMetByCurrentUser && (
-          <div className="ml-auto w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+      {isMetByCurrentUser && (
+        <div className="absolute top-2 right-2">
+          <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
             <CheckCircle2 className="w-4 h-4 text-white" />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="absolute bottom-0 left-0 right-0 p-2.5">
         {isMetByAnyone && metByUser && (

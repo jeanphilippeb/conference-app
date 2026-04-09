@@ -14,7 +14,6 @@ import {
   MessageSquare,
   UserCheck,
   UserX,
-  Phone,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
@@ -45,14 +44,13 @@ interface ConferenceInfo {
 const LEFT_ACTION_WIDTH = 80  // "Add Note" button width
 const RIGHT_ACTION_WIDTH = 80 // "Met/Unmet" button width
 
-function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkUnmet, onAddNote, onToggleContacted, swipedId, setSwipedId }: {
+function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkUnmet, onAddNote, swipedId, setSwipedId }: {
   target: Target
   currentUserId: string | undefined
   onClick: () => void
   onMarkMet: (target: Target) => void
   onMarkUnmet: (target: Target) => void
   onAddNote: (target: Target) => void
-  onToggleContacted: (target: Target) => void
   swipedId: string | null
   setSwipedId: (id: string | null) => void
 }) {
@@ -206,18 +204,6 @@ function SwipeableTargetRow({ target, currentUserId, onClick, onMarkMet, onMarkU
 
         {/* Right indicators */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Contacted toggle */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleContacted(target) }}
-            className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
-              target.contacted
-                ? 'bg-sky-500/20 text-sky-400'
-                : 'text-[var(--text-muted)] hover:text-sky-400 hover:bg-sky-500/10'
-            }`}
-          >
-            <Phone className="w-3.5 h-3.5" />
-          </button>
-
           {isMetByAnyone && (
             <span className="text-xs text-emerald-400 font-medium">
               {metInteractions.length > 1 ? `${metInteractions.length}×` : '✓'}
@@ -234,7 +220,7 @@ export function ListView() {
   const { conferenceId } = useParams<{ conferenceId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const { targets, loading, createInteraction, deleteInteraction, toggleContacted } = useTargets(conferenceId)
+  const { targets, loading, createInteraction, deleteInteraction } = useTargets(conferenceId)
   const { triggerMet } = useGame()
   const [conference, setConference] = useState<ConferenceInfo | null>(null)
   const { setContext } = useGameSheet()
@@ -276,14 +262,6 @@ export function ListView() {
     setNoteText('')
     setTimeout(() => noteInputRef.current?.focus(), 100)
   }, [])
-
-  const handleToggleContacted = useCallback(async (target: Target) => {
-    try {
-      await toggleContacted(target.id, !target.contacted)
-    } catch (err) {
-      console.error('Failed to toggle contacted:', err)
-    }
-  }, [toggleContacted])
 
   const handleSaveNote = useCallback(async () => {
     if (!noteTarget || !noteText.trim()) return
@@ -610,7 +588,6 @@ export function ListView() {
                 onMarkMet={handleMarkMet}
                 onMarkUnmet={handleMarkUnmet}
                 onAddNote={handleAddNote}
-                onToggleContacted={handleToggleContacted}
                 swipedId={swipedId}
                 setSwipedId={setSwipedId}
               />
