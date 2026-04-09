@@ -109,8 +109,24 @@ export function useTargets(conferenceId: string | undefined) {
       .single()
 
     if (error) throw error
-    await fetchTargets()
-    return data as Interaction
+
+    // Optimistically add the new interaction to local state immediately
+    const newInteraction = data as Interaction
+    const addToCache = (list: Target[]) =>
+      list.map(t =>
+        t.id === targetId
+          ? { ...t, interactions: [newInteraction, ...(t.interactions || [])], latest_interaction: newInteraction }
+          : t
+      )
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, addToCache(cached))
+    }
+    setTargets(prev => addToCache(prev))
+
+    // Background refetch to hydrate profile join etc.
+    fetchTargets()
+    return newInteraction
   }
 
   const deleteInteraction = async (interactionId: string) => {
@@ -120,7 +136,22 @@ export function useTargets(conferenceId: string | undefined) {
       .eq('id', interactionId)
 
     if (error) throw error
-    await fetchTargets()
+
+    const removeFromCache = (list: Target[]) =>
+      list.map(t => {
+        const remaining = (t.interactions || []).filter(i => i.id !== interactionId)
+        return {
+          ...t,
+          interactions: remaining,
+          latest_interaction: t.latest_interaction?.id === interactionId ? remaining[0] : t.latest_interaction,
+        }
+      })
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, removeFromCache(cached))
+    }
+    setTargets(prev => removeFromCache(prev))
+    fetchTargets()
   }
 
   // Delete multiple interactions in parallel then refetch once
@@ -132,25 +163,50 @@ export function useTargets(conferenceId: string | undefined) {
         })
       )
     )
-    await fetchTargets()
+
+    const idSet = new Set(interactionIds)
+    const removeFromCache = (list: Target[]) =>
+      list.map(t => {
+        const remaining = (t.interactions || []).filter(i => !idSet.has(i.id))
+        return {
+          ...t,
+          interactions: remaining,
+          latest_interaction: t.latest_interaction && idSet.has(t.latest_interaction.id) ? remaining[0] : t.latest_interaction,
+        }
+      })
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, removeFromCache(cached))
+    }
+    setTargets(prev => removeFromCache(prev))
+    fetchTargets()
   }
 
   const toggleContacted = async (targetId: string, contacted: boolean) => {
+    // Optimistic update first so UI responds instantly
+    const apply = (list: Target[]) => list.map(t => t.id === targetId ? { ...t, contacted } : t)
+    const revert = (list: Target[]) => list.map(t => t.id === targetId ? { ...t, contacted: !contacted } : t)
+
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, apply(cached))
+    }
+    setTargets(prev => apply(prev))
+
     const { error } = await supabase
       .from('conference_targets')
       .update({ contacted })
       .eq('id', targetId)
 
-    if (error) throw error
-
-    const updateInCache = (list: Target[]) =>
-      list.map(t => t.id === targetId ? { ...t, contacted } : t)
-
-    if (conferenceId) {
-      const cached = targetsCache.get(conferenceId)
-      if (cached) targetsCache.set(conferenceId, updateInCache(cached))
+    if (error) {
+      // Revert on failure
+      if (conferenceId) {
+        const cached = targetsCache.get(conferenceId)
+        if (cached) targetsCache.set(conferenceId, revert(cached))
+      }
+      setTargets(prev => revert(prev))
+      throw error
     }
-    setTargets(prev => updateInCache(prev))
   }
 
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
