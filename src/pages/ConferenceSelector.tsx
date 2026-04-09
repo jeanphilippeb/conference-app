@@ -61,7 +61,6 @@ function ConferenceCard({ conf, onClick }: { conf: Conference; onClick: () => vo
         <div className="flex-1">
           <CoverageBar met={conf.met_count || 0} total={conf.target_count || 0} showLabel={false} />
         </div>
-        <span className="text-xs text-[var(--text-secondary)]">{pct}%</span>
       </div>
     </button>
   )
