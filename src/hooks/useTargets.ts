@@ -100,50 +100,76 @@ export function useTargets(conferenceId: string | undefined) {
     status: Interaction['status'] = 'met',
     score = 0
   ) => {
-    const { data: userData } = await supabase.auth.getUser()
-    const userId = userData?.user?.id
-
+    // getSession reads from localStorage — no network call, instant
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
     if (!userId) throw new Error('Not authenticated')
 
-    const { data, error } = await supabase
-      .from('conference_interactions')
-      .insert({
-        target_id: targetId,
-        user_id: userId,
-        status,
-        notes,
-        met_at: new Date().toISOString(),
-        score,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-
-    // Optimistically add the new interaction to local state immediately
-    const newInteraction = data as Interaction
-    const addToCache = (list: Target[]) =>
+    // Optimistic: add temp interaction to UI immediately
+    const tempId = `temp_${Date.now()}`
+    const metAt = new Date().toISOString()
+    const optimistic: Interaction = {
+      id: tempId,
+      target_id: targetId,
+      user_id: userId,
+      status,
+      notes,
+      met_at: metAt,
+      created_at: metAt,
+      score,
+    }
+    const addOptimistic = (list: Target[]) =>
       list.map(t =>
         t.id === targetId
-          ? { ...t, interactions: [newInteraction, ...(t.interactions || [])], latest_interaction: newInteraction }
+          ? { ...t, interactions: [optimistic, ...(t.interactions || [])], latest_interaction: optimistic }
           : t
       )
     if (conferenceId) {
       const cached = targetsCache.get(conferenceId)
-      if (cached) targetsCache.set(conferenceId, addToCache(cached))
+      if (cached) targetsCache.set(conferenceId, addOptimistic(cached))
     }
-    setTargets(prev => addToCache(prev))
-    return newInteraction
+    setTargets(prev => addOptimistic(prev))
+
+    // Persist to DB — replace temp with real on success, revert on error
+    const { data, error } = await supabase
+      .from('conference_interactions')
+      .insert({ target_id: targetId, user_id: userId, status, notes, met_at: metAt, score })
+      .select()
+      .single()
+
+    if (error) {
+      const revert = (list: Target[]) =>
+        list.map(t => {
+          if (t.id !== targetId) return t
+          const remaining = (t.interactions || []).filter(i => i.id !== tempId)
+          return { ...t, interactions: remaining, latest_interaction: remaining[0] }
+        })
+      if (conferenceId) {
+        const cached = targetsCache.get(conferenceId)
+        if (cached) targetsCache.set(conferenceId, revert(cached))
+      }
+      setTargets(prev => revert(prev))
+      throw error
+    }
+
+    const real = data as Interaction
+    const replaceTemp = (list: Target[]) =>
+      list.map(t => {
+        if (t.id !== targetId) return t
+        const interactions = (t.interactions || []).map(i => i.id === tempId ? real : i)
+        const latest = t.latest_interaction?.id === tempId ? real : t.latest_interaction
+        return { ...t, interactions, latest_interaction: latest }
+      })
+    if (conferenceId) {
+      const cached = targetsCache.get(conferenceId)
+      if (cached) targetsCache.set(conferenceId, replaceTemp(cached))
+    }
+    setTargets(prev => replaceTemp(prev))
+    return real
   }
 
   const deleteInteraction = async (interactionId: string) => {
-    const { error } = await supabase
-      .from('conference_interactions')
-      .delete()
-      .eq('id', interactionId)
-
-    if (error) throw error
-
+    // Optimistic: remove from UI immediately
     const removeFromCache = (list: Target[]) =>
       list.map(t => {
         const remaining = (t.interactions || []).filter(i => i.id !== interactionId)
@@ -158,18 +184,18 @@ export function useTargets(conferenceId: string | undefined) {
       if (cached) targetsCache.set(conferenceId, removeFromCache(cached))
     }
     setTargets(prev => removeFromCache(prev))
+
+    const { error } = await supabase
+      .from('conference_interactions')
+      .delete()
+      .eq('id', interactionId)
+
+    if (error) throw error
   }
 
   // Delete multiple interactions in parallel then update cache
   const deleteInteractions = async (interactionIds: string[]) => {
-    await Promise.all(
-      interactionIds.map(id =>
-        supabase.from('conference_interactions').delete().eq('id', id).then(({ error }) => {
-          if (error) throw error
-        })
-      )
-    )
-
+    // Optimistic: remove from UI immediately
     const idSet = new Set(interactionIds)
     const removeFromCache = (list: Target[]) =>
       list.map(t => {
@@ -185,6 +211,14 @@ export function useTargets(conferenceId: string | undefined) {
       if (cached) targetsCache.set(conferenceId, removeFromCache(cached))
     }
     setTargets(prev => removeFromCache(prev))
+
+    await Promise.all(
+      interactionIds.map(id =>
+        supabase.from('conference_interactions').delete().eq('id', id).then(({ error }) => {
+          if (error) throw error
+        })
+      )
+    )
   }
 
   const toggleContacted = async (targetId: string, contacted: boolean) => {
