@@ -388,6 +388,22 @@ export function CardView() {
         <PointsFloater points={floatingPts} onDone={() => setFloatingPts(null)} />
       )}
 
+      {/* Sticky nav bar — always visible */}
+      <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 pt-12 pb-2 pointer-events-none">
+        <button
+          onClick={() => navigate(-1)}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors pointer-events-auto"
+        >
+          <ArrowLeft className="w-5 h-5 text-white" />
+        </button>
+        <button
+          onClick={() => navigate(`/conference/${conferenceId}/target/${targetId}/edit`)}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors pointer-events-auto"
+        >
+          <Edit2 className="w-4 h-4 text-white" />
+        </button>
+      </div>
+
       {/* Hero photo area */}
       <div className="relative" style={{ height: '45vh', minHeight: 240 }}>
         {target.photo_url ? (
@@ -407,20 +423,6 @@ export function CardView() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/20 to-transparent" />
 
-        <div className="absolute top-12 left-0 right-0 flex items-center justify-between px-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-[var(--text)]" />
-          </button>
-          <button
-            onClick={() => navigate(`/conference/${conferenceId}/target/${targetId}/edit`)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors"
-          >
-            <Edit2 className="w-4 h-4 text-[var(--text)]" />
-          </button>
-        </div>
       </div>
 
       {/* Content */}
