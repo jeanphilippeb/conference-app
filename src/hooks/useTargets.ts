@@ -123,9 +123,6 @@ export function useTargets(conferenceId: string | undefined) {
       if (cached) targetsCache.set(conferenceId, addToCache(cached))
     }
     setTargets(prev => addToCache(prev))
-
-    // Background refetch to hydrate profile join etc.
-    fetchTargets()
     return newInteraction
   }
 
@@ -151,10 +148,9 @@ export function useTargets(conferenceId: string | undefined) {
       if (cached) targetsCache.set(conferenceId, removeFromCache(cached))
     }
     setTargets(prev => removeFromCache(prev))
-    fetchTargets()
   }
 
-  // Delete multiple interactions in parallel then refetch once
+  // Delete multiple interactions in parallel then update cache
   const deleteInteractions = async (interactionIds: string[]) => {
     await Promise.all(
       interactionIds.map(id =>
@@ -179,7 +175,6 @@ export function useTargets(conferenceId: string | undefined) {
       if (cached) targetsCache.set(conferenceId, removeFromCache(cached))
     }
     setTargets(prev => removeFromCache(prev))
-    fetchTargets()
   }
 
   const toggleContacted = async (targetId: string, contacted: boolean) => {
