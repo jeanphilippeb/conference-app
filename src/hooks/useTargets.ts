@@ -71,8 +71,18 @@ export function useTargets(conferenceId: string | undefined) {
         } as Target
       })
 
-      targetsCache.set(conferenceId, enriched)
-      setTargets(enriched)
+      // Merge with the current cache to preserve any optimistic updates that
+      // happened while this fetch was in-flight (e.g. toggleContacted race condition).
+      const currentCache = targetsCache.get(conferenceId)
+      const merged = currentCache
+        ? enriched.map(t => {
+            const cur = currentCache.find(c => c.id === t.id)
+            return cur ? { ...t, contacted: cur.contacted ?? t.contacted } : t
+          })
+        : enriched
+
+      targetsCache.set(conferenceId, merged)
+      setTargets(merged)
     } catch (err: any) {
       setError(err.message || 'Failed to fetch targets')
     } finally {
