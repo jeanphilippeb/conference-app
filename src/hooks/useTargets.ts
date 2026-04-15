@@ -222,6 +222,8 @@ export function useTargets(conferenceId: string | undefined) {
   }
 
   const toggleContacted = async (targetId: string, contacted: boolean) => {
+    console.log('[toggleContacted] Attempting update:', { targetId, contacted })
+
     // Optimistic update first so UI responds instantly
     const apply = (list: Target[]) => list.map(t => t.id === targetId ? { ...t, contacted } : t)
     const revert = (list: Target[]) => list.map(t => t.id === targetId ? { ...t, contacted: !contacted } : t)
@@ -232,12 +234,15 @@ export function useTargets(conferenceId: string | undefined) {
     }
     setTargets(prev => apply(prev))
 
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('conference_targets')
       .update({ contacted })
       .eq('id', targetId)
+      .select()
+      .single()
 
     if (error) {
+      console.error('[toggleContacted] Database update failed:', error)
       // Revert on failure
       if (conferenceId) {
         const cached = targetsCache.get(conferenceId)
@@ -246,17 +251,22 @@ export function useTargets(conferenceId: string | undefined) {
       setTargets(prev => revert(prev))
       throw error
     }
+
+    console.log('[toggleContacted] Database update succeeded:', data)
   }
 
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
-    const { error } = await supabase
-      .from('conference_interactions')
-      .update({ notes })
-      .eq('id', interactionId)
+    // Find previous notes for revert
+    let prevNotes: string | undefined
+    for (const t of targets) {
+      const interaction = (t.interactions || []).find(i => i.id === interactionId)
+      if (interaction) {
+        prevNotes = interaction.notes
+        break
+      }
+    }
 
-    if (error) throw error
-
-    // Update in-place in the cache and state — no full refetch needed
+    // Optimistic update - cache FIRST
     const updateInCache = (list: Target[]) =>
       list.map(t => ({
         ...t,
@@ -269,11 +279,39 @@ export function useTargets(conferenceId: string | undefined) {
             : t.latest_interaction,
       }))
 
+    const revertInCache = (list: Target[]) =>
+      list.map(t => ({
+        ...t,
+        interactions: (t.interactions || []).map(i =>
+          i.id === interactionId ? { ...i, notes: prevNotes } : i
+        ),
+        latest_interaction:
+          t.latest_interaction?.id === interactionId
+            ? { ...t.latest_interaction, notes: prevNotes }
+            : t.latest_interaction,
+      }))
+
     if (conferenceId) {
       const cached = targetsCache.get(conferenceId)
       if (cached) targetsCache.set(conferenceId, updateInCache(cached))
     }
     setTargets(prev => updateInCache(prev))
+
+    // Perform DB update
+    const { error } = await supabase
+      .from('conference_interactions')
+      .update({ notes })
+      .eq('id', interactionId)
+
+    // Revert on error
+    if (error) {
+      if (conferenceId) {
+        const cached = targetsCache.get(conferenceId)
+        if (cached) targetsCache.set(conferenceId, revertInCache(cached))
+      }
+      setTargets(prev => revertInCache(prev))
+      throw error
+    }
   }
 
   return {

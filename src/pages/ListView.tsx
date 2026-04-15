@@ -30,10 +30,8 @@ import {
 } from '@/lib/helpers'
 import { Target, Priority } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-
-type SortKey = 'priority' | 'name' | 'company' | 'recent'
-type PriorityFilter = 'all' | Priority
-type StatusFilter = 'all' | 'met' | 'not_met' | 'contacted'
+import { SortKey, PriorityFilter, StatusFilter } from '@/lib/filterTypes'
+import { useFilterPersistence } from '@/hooks/useFilterPersistence'
 
 interface ConferenceInfo {
   name: string
@@ -293,13 +291,22 @@ export function ListView() {
     return () => setContext(undefined)
   }, [conferenceId, setContext])
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [companyFilter, setCompanyFilter] = useState<string | null>(null)
-  const [sort, setSort] = useState<SortKey>('priority')
-  const [showSortMenu, setShowSortMenu] = useState(false)
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchOpen,
+    setSearchOpen,
+    priorityFilter,
+    setPriorityFilter,
+    statusFilter,
+    setStatusFilter,
+    companyFilter,
+    setCompanyFilter,
+    sort,
+    setSort,
+    showSortMenu,
+    setShowSortMenu,
+  } = useFilterPersistence(conferenceId)
 
   const metCount = useMemo(
     () => targets.filter(t => (t.interactions || []).some(i => i.status === 'met')).length,

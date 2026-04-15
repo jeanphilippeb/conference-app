@@ -17,6 +17,7 @@ import {
   X,
   MoreHorizontal,
   PhoneCall,
+  AlertCircle,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useAuthContext } from '@/context/AuthContext'
@@ -64,6 +65,7 @@ function InteractionItem({
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(interaction.notes || '')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [swiped, setSwiped] = useState(false)
   const touchStartX = useRef(0)
@@ -120,11 +122,13 @@ function InteractionItem({
   const handleSave = async () => {
     if (!onEditSave) return
     setSaving(true)
+    setSaveError(null)
     try {
       await onEditSave(editText)
       setIsEditing(false)
-    } catch {
-      // silent
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save notes. Please try again.')
+      // Keep edit mode open for retry
     } finally {
       setSaving(false)
     }
@@ -233,6 +237,12 @@ function InteractionItem({
                   Cancel
                 </button>
               </div>
+              {saveError && (
+                <div className="mt-2 text-xs text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {saveError}
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -265,6 +275,7 @@ export function CardView() {
   const [savingNew, setSavingNew] = useState(false)
   const [confirmUnmet, setConfirmUnmet] = useState(false)
   const [markingUnmet, setMarkingUnmet] = useState(false)
+  const [togglingContacted, setTogglingContacted] = useState(false)
   const newNoteRef = useRef<HTMLTextAreaElement>(null)
 
   const target: Target | undefined = targets.find(t => t.id === targetId)
@@ -347,6 +358,19 @@ export function CardView() {
         }
       })
       if (addingNote) newNoteRef.current?.focus()
+    }
+  }
+
+  const handleToggleContacted = async () => {
+    if (!target || togglingContacted) return
+    setTogglingContacted(true)
+    try {
+      await toggleContacted(target.id, !target.contacted)
+    } catch (err) {
+      console.error('Failed to update contacted status:', err)
+      alert('Failed to update contacted status. Please check your connection and try again.')
+    } finally {
+      setTogglingContacted(false)
     }
   }
 
@@ -512,15 +536,25 @@ export function CardView() {
 
         {/* Contacted toggle */}
         <button
-          onClick={() => toggleContacted(target.id, !target.contacted)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium mb-4 transition-colors ${
+          onClick={handleToggleContacted}
+          disabled={togglingContacted}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium mb-4 transition-colors disabled:opacity-50 ${
             target.contacted
               ? 'bg-sky-500/15 border-sky-500/40 text-sky-400'
               : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)] hover:border-sky-500/40 hover:text-sky-400'
           }`}
         >
-          <PhoneCall className="w-4 h-4" />
-          {target.contacted ? 'Contacted' : 'Mark as Contacted'}
+          {togglingContacted ? (
+            <>
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Updating...
+            </>
+          ) : (
+            <>
+              <PhoneCall className="w-4 h-4" />
+              {target.contacted ? 'Contacted' : 'Mark as Contacted'}
+            </>
+          )}
         </button>
 
         {/* Pre-notes / Context */}
