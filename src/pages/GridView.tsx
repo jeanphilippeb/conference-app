@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   BarChart2,
   SlidersHorizontal,
+  Share2,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
@@ -23,6 +24,7 @@ import { Target, Priority } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { SortKey, PriorityFilter, StatusFilter } from '@/lib/filterTypes'
 import { useFilterPersistence } from '@/hooks/useFilterPersistence'
+import { buildInteractionsCsv, shareOrDownloadCsv } from '@/lib/exportCsv'
 
 interface ConferenceInfo {
   name: string
@@ -278,6 +280,17 @@ export function GridView() {
             </p>
           </div>
           <GameHeaderButton />
+          <button
+            onClick={() => shareOrDownloadCsv(
+              buildInteractionsCsv(targets, conference?.name ?? ''),
+              `${(conference?.name ?? 'conference').replace(/\s+/g, '_')}_interactions.csv`
+            )}
+            disabled={loading || targets.length === 0}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0 disabled:opacity-40"
+            title="Export interactions"
+          >
+            <Share2 className="w-4 h-4 text-[var(--text-secondary)]" />
+          </button>
           <button
             onClick={() => navigate(`/conference/${conferenceId}/coverage`)}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-deep)] transition-colors flex-shrink-0"
