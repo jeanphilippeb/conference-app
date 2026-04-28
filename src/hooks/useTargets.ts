@@ -131,11 +131,15 @@ export function useTargets(conferenceId: string | undefined) {
     setTargets(prev => addOptimistic(prev))
 
     // Persist to DB — replace temp with real on success, revert on error
-    const { data, error } = await supabase
+    const insertQuery = supabase
       .from('conference_interactions')
       .insert({ target_id: targetId, user_id: userId, status, notes, met_at: metAt, score })
       .select()
       .single()
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), 12000)
+    )
+    const { data, error } = await Promise.race([insertQuery, timeout]) as Awaited<typeof insertQuery>
 
     if (error) {
       const revert = (list: Target[]) =>

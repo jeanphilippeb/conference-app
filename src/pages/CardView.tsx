@@ -273,10 +273,16 @@ export function CardView() {
   const [addingNote, setAddingNote] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [savingNew, setSavingNew] = useState(false)
+  const [saveNoteError, setSaveNoteError] = useState<string | null>(null)
   const [confirmUnmet, setConfirmUnmet] = useState(false)
   const [markingUnmet, setMarkingUnmet] = useState(false)
   const [togglingContacted, setTogglingContacted] = useState(false)
   const newNoteRef = useRef<HTMLTextAreaElement>(null)
+
+  // Stop mic whenever the note form is closed (covers cancel, save, and navigation)
+  useEffect(() => {
+    if (!addingNote) stopListening()
+  }, [addingNote, stopListening])
 
   const target: Target | undefined = targets.find(t => t.id === targetId)
 
@@ -304,8 +310,8 @@ export function CardView() {
   const handleSaveNewNote = async () => {
     if (!targetId || !target || !newNote.trim()) return
     setSavingNew(true)
+    setSaveNoteError(null)
     try {
-      // If user wasn't met yet, award met points (same as "I Met Them" flow)
       let score = 0
       if (!isMetByCurrentUser) {
         const { pts } = await triggerMet(target.priority)
@@ -313,10 +319,11 @@ export function CardView() {
         setFloatingPts(pts)
       }
       await createInteraction(targetId, newNote.trim(), 'met', score)
+      stopListening()
       setNewNote('')
       setAddingNote(false)
-    } catch (err) {
-      console.error(err)
+    } catch (err: any) {
+      setSaveNoteError(err.message || 'Failed to save. Please try again.')
     } finally {
       setSavingNew(false)
     }
@@ -649,6 +656,9 @@ export function CardView() {
                   </>
                 )}
               </button>
+              {saveNoteError && (
+                <p className="text-xs text-red-400 text-center">{saveNoteError}</p>
+              )}
             </div>
           ) : confirmUnmet ? (
             <div className="space-y-2">
@@ -683,7 +693,7 @@ export function CardView() {
                 </span>
               </div>
               <button
-                onClick={() => setAddingNote(true)}
+                onClick={() => { setSaveNoteError(null); setNewNote(''); setAddingNote(true) }}
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--bg-deep)] transition-colors text-sm text-[var(--text-secondary)] font-medium flex-shrink-0"
               >
                 <MessageSquare className="w-4 h-4" />
@@ -746,6 +756,9 @@ export function CardView() {
                 </>
               )}
             </button>
+            {saveNoteError && (
+              <p className="text-xs text-red-400 text-center">{saveNoteError}</p>
+            )}
           </div>
         ) : (
           <div className="flex gap-2">
@@ -768,7 +781,7 @@ export function CardView() {
                 )}
               </button>
               <button
-                onClick={() => setAddingNote(true)}
+                onClick={() => { setSaveNoteError(null); setNewNote(''); setAddingNote(true) }}
                 className="flex items-center gap-1.5 px-3 py-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:bg-[var(--bg-deep)] transition-colors text-sm text-[var(--text-secondary)] font-medium flex-shrink-0"
               >
                 <MessageSquare className="w-4 h-4" />
