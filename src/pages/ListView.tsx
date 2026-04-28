@@ -230,10 +230,15 @@ export function ListView() {
   const [noteTarget, setNoteTarget] = useState<Target | null>(null)
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
+  const [noteSaveError, setNoteSaveError] = useState<string | null>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
-  const handleListScroll = useCallback(() => {
-    if (swipedId) setSwipedId(null)
+  // Close any open swipe row when the window scrolls
+  useEffect(() => {
+    if (!swipedId) return
+    const handler = () => setSwipedId(null)
+    window.addEventListener('scroll', handler, { passive: true })
+    return () => window.removeEventListener('scroll', handler)
   }, [swipedId])
 
   const handleMarkMet = useCallback(async (target: Target) => {
@@ -260,18 +265,20 @@ export function ListView() {
   const handleAddNote = useCallback((target: Target) => {
     setNoteTarget(target)
     setNoteText('')
+    setNoteSaveError(null)
     setTimeout(() => noteInputRef.current?.focus(), 100)
   }, [])
 
   const handleSaveNote = useCallback(async () => {
     if (!noteTarget || !noteText.trim()) return
     setNoteSaving(true)
+    setNoteSaveError(null)
     try {
       await createInteraction(noteTarget.id, noteText.trim(), 'met', 0)
       setNoteTarget(null)
       setNoteText('')
-    } catch (err) {
-      console.error('Failed to save note:', err)
+    } catch (err: any) {
+      setNoteSaveError(err.message || 'Failed to save. Please try again.')
     } finally {
       setNoteSaving(false)
     }
@@ -598,7 +605,7 @@ export function ListView() {
         </div>
       ) : (
         <>
-          <div className="divide-y divide-[var(--divider)]" onScroll={handleListScroll}>
+          <div className="divide-y divide-[var(--divider)]">
             {filteredSortedTargets.map((target) => (
               <SwipeableTargetRow
                 key={target.id}
@@ -626,7 +633,7 @@ export function ListView() {
           <div className="relative w-full max-w-lg bg-[var(--bg-elevated)] rounded-t-2xl p-4 pb-8 animate-slide-up">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[var(--text)] font-semibold text-sm">
-                Note pour {noteTarget.first_name} {noteTarget.last_name}
+                Note — {noteTarget.first_name} {noteTarget.last_name}
               </h3>
               <button onClick={() => setNoteTarget(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-deep)]">
                 <X className="w-4 h-4 text-[var(--text-secondary)]" />
@@ -636,16 +643,19 @@ export function ListView() {
               ref={noteInputRef}
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Ajouter une note..."
+              placeholder="What did you talk about?"
               rows={3}
               className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500 transition-colors text-sm resize-none"
             />
+            {noteSaveError && (
+              <p className="mt-1.5 text-xs text-red-400">{noteSaveError}</p>
+            )}
             <button
               onClick={handleSaveNote}
               disabled={!noteText.trim() || noteSaving}
               className="mt-3 w-full py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm disabled:opacity-40 active:bg-blue-700 transition-colors"
             >
-              {noteSaving ? 'Saving...' : 'Enregistrer'}
+              {noteSaving ? 'Saving...' : 'Save Note'}
             </button>
           </div>
         </div>

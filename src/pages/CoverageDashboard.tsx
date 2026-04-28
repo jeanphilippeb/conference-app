@@ -48,19 +48,26 @@ export function CoverageDashboard() {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
+      const fetchQuery = supabase
         .from('conference_targets')
         .select('*, interactions:conference_interactions(*, profile:conference_profiles(id, name, avatar_url))')
-        .eq('conference_id', conferenceId)
+        .eq('conference_id', conferenceId!)
 
-      if (fetchError) {
-        setError(fetchError.message)
+      try {
+        const result = await Promise.race([
+          fetchQuery,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), 12000)
+          ),
+        ]) as Awaited<typeof fetchQuery>
+
+        if (result.error) throw result.error
+        setTargets((result.data as TargetWithInteractions[]) || [])
+      } catch (err: any) {
+        setError(err.message || 'Failed to load coverage data')
+      } finally {
         setLoading(false)
-        return
       }
-
-      setTargets((data as TargetWithInteractions[]) || [])
-      setLoading(false)
     }
 
     fetchData()
