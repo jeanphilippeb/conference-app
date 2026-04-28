@@ -169,20 +169,26 @@ export function AddTargetPage() {
         added_by: user?.id,
       }
 
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), 12000)
+      )
+
       if (isEdit && targetId) {
-        const { error } = await supabase
+        const updateQuery = supabase
           .from('conference_targets')
           .update(payload)
           .eq('id', targetId)
+        const { error } = await Promise.race([updateQuery, timeout]) as Awaited<typeof updateQuery>
         if (error) throw error
         if (conferenceId) clearTargetsCache(conferenceId)
         navigate(-1)
       } else {
-        const { data, error } = await supabase
+        const insertQuery = supabase
           .from('conference_targets')
           .insert(payload)
           .select()
           .single()
+        const { data, error } = await Promise.race([insertQuery, timeout]) as Awaited<typeof insertQuery>
         if (error) throw error
         if (conferenceId) clearTargetsCache(conferenceId)
         navigate(`/conference/${conferenceId}/target/${data.id}`, { replace: true })
