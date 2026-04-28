@@ -15,25 +15,18 @@ export function useRealtimeSync(
       .channel(`conference_interactions_${conferenceId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'conference_interactions',
-        },
-        () => {
-          onChangeRef.current()
-        }
+        { event: 'INSERT', schema: 'public', table: 'conference_interactions' },
+        () => { onChangeRef.current() }
       )
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conference_interactions',
-        },
-        () => {
-          onChangeRef.current()
-        }
+        { event: 'UPDATE', schema: 'public', table: 'conference_interactions' },
+        () => { onChangeRef.current() }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'conference_interactions' },
+        () => { onChangeRef.current() }
       )
       .subscribe()
 

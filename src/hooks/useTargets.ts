@@ -130,24 +130,38 @@ export function useTargets(conferenceId: string | undefined) {
     }
     setTargets(prev => addOptimistic(prev))
 
-    // Persist to DB — replace temp with real on success, revert on error
+    // Persist to DB — replace temp with real on success, revert on error or timeout
+    const revert = (list: Target[]) =>
+      list.map(t => {
+        if (t.id !== targetId) return t
+        const remaining = (t.interactions || []).filter(i => i.id !== tempId)
+        return { ...t, interactions: remaining, latest_interaction: remaining[0] }
+      })
+
     const insertQuery = supabase
       .from('conference_interactions')
       .insert({ target_id: targetId, user_id: userId, status, notes, met_at: metAt, score })
       .select()
       .single()
-    const timeout = new Promise<never>((_, reject) =>
+    const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), 12000)
     )
-    const { data, error } = await Promise.race([insertQuery, timeout]) as Awaited<typeof insertQuery>
 
+    let result: Awaited<typeof insertQuery>
+    try {
+      result = await Promise.race([insertQuery, timeoutPromise]) as Awaited<typeof insertQuery>
+    } catch (err) {
+      // Timeout or network failure — always revert the optimistic update
+      if (conferenceId) {
+        const cached = targetsCache.get(conferenceId)
+        if (cached) targetsCache.set(conferenceId, revert(cached))
+      }
+      setTargets(prev => revert(prev))
+      throw err
+    }
+
+    const { data, error } = result
     if (error) {
-      const revert = (list: Target[]) =>
-        list.map(t => {
-          if (t.id !== targetId) return t
-          const remaining = (t.interactions || []).filter(i => i.id !== tempId)
-          return { ...t, interactions: remaining, latest_interaction: remaining[0] }
-        })
       if (conferenceId) {
         const cached = targetsCache.get(conferenceId)
         if (cached) targetsCache.set(conferenceId, revert(cached))
@@ -189,10 +203,11 @@ export function useTargets(conferenceId: string | undefined) {
     }
     setTargets(prev => removeFromCache(prev))
 
-    const { error } = await supabase
-      .from('conference_interactions')
-      .delete()
-      .eq('id', interactionId)
+    const deleteQuery = supabase.from('conference_interactions').delete().eq('id', interactionId)
+    const { error } = await Promise.race([
+      deleteQuery,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Delete timed out.')), 12000)),
+    ]) as Awaited<typeof deleteQuery>
 
     if (error) throw error
   }
@@ -226,7 +241,6 @@ export function useTargets(conferenceId: string | undefined) {
   }
 
   const toggleContacted = async (targetId: string, contacted: boolean) => {
-    console.log('[toggleContacted] Attempting update:', { targetId, contacted })
 
     // Optimistic update first so UI responds instantly
     const apply = (list: Target[]) => list.map(t => t.id === targetId ? { ...t, contacted } : t)
@@ -238,16 +252,30 @@ export function useTargets(conferenceId: string | undefined) {
     }
     setTargets(prev => apply(prev))
 
-    const { error, data } = await supabase
+    const updateQuery = supabase
       .from('conference_targets')
       .update({ contacted })
       .eq('id', targetId)
       .select()
       .single()
 
+    let result: Awaited<typeof updateQuery>
+    try {
+      result = await Promise.race([
+        updateQuery,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Update timed out. Check your connection.')), 12000)),
+      ]) as Awaited<typeof updateQuery>
+    } catch (err) {
+      if (conferenceId) {
+        const cached = targetsCache.get(conferenceId)
+        if (cached) targetsCache.set(conferenceId, revert(cached))
+      }
+      setTargets(prev => revert(prev))
+      throw err
+    }
+
+    const { error } = result
     if (error) {
-      console.error('[toggleContacted] Database update failed:', error)
-      // Revert on failure
       if (conferenceId) {
         const cached = targetsCache.get(conferenceId)
         if (cached) targetsCache.set(conferenceId, revert(cached))
@@ -255,8 +283,6 @@ export function useTargets(conferenceId: string | undefined) {
       setTargets(prev => revert(prev))
       throw error
     }
-
-    console.log('[toggleContacted] Database update succeeded:', data)
   }
 
   const updateInteractionNotes = async (interactionId: string, notes: string) => {
@@ -301,20 +327,30 @@ export function useTargets(conferenceId: string | undefined) {
     }
     setTargets(prev => updateInCache(prev))
 
-    // Perform DB update
-    const { error } = await supabase
-      .from('conference_interactions')
-      .update({ notes })
-      .eq('id', interactionId)
-
-    // Revert on error
-    if (error) {
+    // Perform DB update with timeout
+    const updateQuery = supabase.from('conference_interactions').update({ notes }).eq('id', interactionId)
+    let updateResult: Awaited<typeof updateQuery>
+    try {
+      updateResult = await Promise.race([
+        updateQuery,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Update timed out. Check your connection.')), 12000)),
+      ]) as Awaited<typeof updateQuery>
+    } catch (err) {
       if (conferenceId) {
         const cached = targetsCache.get(conferenceId)
         if (cached) targetsCache.set(conferenceId, revertInCache(cached))
       }
       setTargets(prev => revertInCache(prev))
-      throw error
+      throw err
+    }
+
+    if (updateResult.error) {
+      if (conferenceId) {
+        const cached = targetsCache.get(conferenceId)
+        if (cached) targetsCache.set(conferenceId, revertInCache(cached))
+      }
+      setTargets(prev => revertInCache(prev))
+      throw updateResult.error
     }
   }
 
