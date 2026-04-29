@@ -72,21 +72,29 @@ export function useConferences() {
     end_date: string
     status?: Conference['status']
   }) => {
-    const { data: user } = await supabase.auth.getUser()
+    const { data: userData } = await supabase.auth.getUser()
     const { data: created, error } = await supabase
       .from('conference_conferences')
       .insert({
         ...data,
         status: data.status || 'upcoming',
-        created_by: user?.user?.id,
+        created_by: userData?.user?.id,
       })
       .select()
       .single()
 
     if (error) throw error
-    conferencesCache = null
-    await fetchConferences()
-    return created as Conference
+
+    // Optimistic update: add to list immediately without triggering loading skeleton
+    const newConf = { ...created, target_count: 0, met_count: 0 } as Conference
+    const updated = [newConf, ...(conferencesCache || [])]
+    conferencesCache = updated
+    setConferences(updated)
+
+    // Background refresh for accurate counts (won't show skeleton since cache is set)
+    fetchConferences()
+
+    return newConf
   }
 
   return { conferences, loading, error, refetch: fetchConferences, createConference, invalidateCache }
