@@ -75,7 +75,11 @@ export function useAuth() {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // ignore — sign out regardless
+    }
     // Hard reload clears all module-level caches (targets, conferences, leaderboard)
     // and guarantees a clean state for the next user
     window.location.href = '/auth'
