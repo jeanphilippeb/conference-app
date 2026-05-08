@@ -11,15 +11,17 @@ export function useConferences() {
   const [loading, setLoading] = useState(conferencesCache === null)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchConferences = useCallback(async (retryCount = 0) => {
-    // Only show skeleton on first load — if cache exists, refetch silently
-    if (conferencesCache === null) setLoading(true)
+  // isManual = true skips the auto-retry logic so the user always gets a definitive
+  // result (loading visible, no hidden 1.5s delay before showing the outcome).
+  const fetchConferences = useCallback(async (retryCount = 0, isManual = false) => {
+    // Always show skeleton — either first load (cache null) or manual refetch
+    if (conferencesCache === null || isManual) setLoading(true)
     setError(null)
     try {
       // Race against a 10s timeout — Supabase can hang indefinitely when the
       // client is waiting for a token refresh that never completes.
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out — tap Refresh to retry')), 10000)
+        setTimeout(() => reject(new Error('Request timed out')), 10000)
       )
 
       const [{ data: confs, error: confError }, { data: allTargets }, { data: metInteractions }] =
@@ -42,9 +44,9 @@ export function useConferences() {
 
       if (confError) throw confError
       if (!confs || confs.length === 0) {
-        // On first load, retry once after a short delay to handle the race condition
-        // between Supabase INITIAL_SESSION firing and the auth token being fully ready.
-        if (retryCount === 0) {
+        // On automatic first load, retry once to handle the INITIAL_SESSION / token-refresh race.
+        // Skip this on manual refetches so the user always gets immediate feedback.
+        if (retryCount === 0 && !isManual) {
           setTimeout(() => fetchConferences(1), 1500)
           return
         }
@@ -70,8 +72,23 @@ export function useConferences() {
 
       conferencesCache = enriched
       setConferences(enriched)
+      sessionStorage.removeItem('conf_reload_attempted')
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch conferences')
+      const msg = err.message || 'Failed to fetch conferences'
+      if (msg === 'Request timed out') {
+        // The Supabase client is stuck on a background token refresh — its internal
+        // refresh promise never resolves, so every query hangs until the 10s timeout.
+        // A page reload reinitializes the client (equivalent to "kill and return").
+        // We use sessionStorage to prevent an infinite reload loop if the network is
+        // genuinely down (in which case we fall through to showing a real error).
+        if (!sessionStorage.getItem('conf_reload_attempted')) {
+          sessionStorage.setItem('conf_reload_attempted', '1')
+          window.location.reload()
+          return
+        }
+        sessionStorage.removeItem('conf_reload_attempted')
+      }
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -82,6 +99,12 @@ export function useConferences() {
   }, [fetchConferences])
 
   const invalidateCache = () => { conferencesCache = null }
+
+  // User-initiated refetch: always shows skeleton and skips auto-retry delay
+  const refetch = useCallback(() => {
+    conferencesCache = null
+    fetchConferences(0, true)
+  }, [fetchConferences])
 
   const createConference = async (data: {
     name: string
@@ -115,5 +138,5 @@ export function useConferences() {
     return newConf
   }
 
-  return { conferences, loading, error, refetch: fetchConferences, createConference, invalidateCache }
+  return { conferences, loading, error, refetch, createConference, invalidateCache }
 }
