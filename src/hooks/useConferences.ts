@@ -11,29 +11,47 @@ export function useConferences() {
   const [loading, setLoading] = useState(conferencesCache === null)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchConferences = useCallback(async () => {
+  const fetchConferences = useCallback(async (retryCount = 0) => {
     // Only show skeleton on first load — if cache exists, refetch silently
     if (conferencesCache === null) setLoading(true)
     setError(null)
     try {
-      // 3 queries total (instead of 3 per conference)
+      // Race against a 10s timeout — Supabase can hang indefinitely when the
+      // client is waiting for a token refresh that never completes.
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out — tap Refresh to retry')), 10000)
+      )
+
       const [{ data: confs, error: confError }, { data: allTargets }, { data: metInteractions }] =
-        await Promise.all([
-          supabase
-            .from('conference_conferences')
-            .select('*')
-            .order('start_date', { ascending: false }),
-          supabase
-            .from('conference_targets')
-            .select('id, conference_id'),
-          supabase
-            .from('conference_interactions')
-            .select('target_id')
-            .eq('status', 'met'),
+        await Promise.race([
+          Promise.all([
+            supabase
+              .from('conference_conferences')
+              .select('*')
+              .order('start_date', { ascending: false }),
+            supabase
+              .from('conference_targets')
+              .select('id, conference_id'),
+            supabase
+              .from('conference_interactions')
+              .select('target_id')
+              .eq('status', 'met'),
+          ]),
+          timeoutPromise,
         ])
 
       if (confError) throw confError
-      if (!confs || confs.length === 0) { setConferences([]); return }
+      if (!confs || confs.length === 0) {
+        // On first load, retry once after a short delay to handle the race condition
+        // between Supabase INITIAL_SESSION firing and the auth token being fully ready.
+        if (retryCount === 0) {
+          setTimeout(() => fetchConferences(1), 1500)
+          return
+        }
+        conferencesCache = []
+        setConferences([])
+        return
+      }
 
       const metTargetIds = new Set((metInteractions || []).map(i => i.target_id))
 
