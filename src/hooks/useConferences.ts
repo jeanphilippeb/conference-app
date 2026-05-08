@@ -72,8 +72,23 @@ export function useConferences() {
 
       conferencesCache = enriched
       setConferences(enriched)
+      sessionStorage.removeItem('conf_reload_attempted')
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch conferences')
+      const msg = err.message || 'Failed to fetch conferences'
+      if (msg === 'Request timed out') {
+        // The Supabase client is stuck on a background token refresh — its internal
+        // refresh promise never resolves, so every query hangs until the 10s timeout.
+        // A page reload reinitializes the client (equivalent to "kill and return").
+        // We use sessionStorage to prevent an infinite reload loop if the network is
+        // genuinely down (in which case we fall through to showing a real error).
+        if (!sessionStorage.getItem('conf_reload_attempted')) {
+          sessionStorage.setItem('conf_reload_attempted', '1')
+          window.location.reload()
+          return
+        }
+        sessionStorage.removeItem('conf_reload_attempted')
+      }
+      setError(msg)
     } finally {
       setLoading(false)
     }
