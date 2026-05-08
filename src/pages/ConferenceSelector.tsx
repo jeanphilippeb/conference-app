@@ -187,7 +187,7 @@ function NewConferenceModal({ onClose, onCreate }: NewConferenceModalProps) {
 
 export function ConferenceSelector() {
   const navigate = useNavigate()
-  const { conferences, loading, createConference } = useConferences()
+  const { conferences, loading, error, refetch, createConference } = useConferences()
   const { profile, signOut } = useAuthContext()
   const [showModal, setShowModal] = useState(false)
 
@@ -236,7 +236,18 @@ export function ConferenceSelector() {
 
       {/* Content */}
       <div className="px-5 space-y-6">
-        {loading ? (
+        {error ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-4">⚠️</div>
+            <p className="text-[var(--text-secondary)] text-sm mb-4">{error}</p>
+            <button
+              onClick={() => refetch()}
+              className="text-blue-400 text-sm underline"
+            >
+              Try again
+            </button>
+          </div>
+        ) : loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-[var(--bg-elevated)] rounded-2xl p-4 animate-pulse">
@@ -306,7 +317,13 @@ export function ConferenceSelector() {
               <div className="text-center py-20">
                 <div className="text-5xl mb-4">🎪</div>
                 <h3 className="text-[var(--text)] font-semibold text-lg mb-2">No conferences yet</h3>
-                <p className="text-[var(--text-secondary)] text-sm">Create your first conference to get started</p>
+                <p className="text-[var(--text-secondary)] text-sm mb-4">Create your first conference to get started</p>
+                <button
+                  onClick={() => refetch()}
+                  className="text-[var(--text-muted)] text-xs underline"
+                >
+                  Refresh
+                </button>
               </div>
             )}
           </>
