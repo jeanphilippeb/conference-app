@@ -240,12 +240,20 @@ export function ConferenceSelector() {
           <div className="text-center py-20">
             <div className="text-4xl mb-4">⚠️</div>
             <p className="text-[var(--text-secondary)] text-sm mb-4">{error}</p>
-            <button
-              onClick={() => refetch()}
-              className="text-blue-400 text-sm underline"
-            >
-              Try again
-            </button>
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={() => refetch()}
+                className="text-blue-400 text-sm underline"
+              >
+                Try again
+              </button>
+              <button
+                onClick={() => { window.location.href = '/auth' }}
+                className="text-[var(--text-muted)] text-xs underline"
+              >
+                Sign in again
+              </button>
+            </div>
           </div>
         ) : loading ? (
           <div className="space-y-3">
