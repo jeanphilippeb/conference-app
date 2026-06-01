@@ -17,6 +17,7 @@ import {
   Share2,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
+import { useConferences } from '@/hooks/useConferences'
 import { useAuthContext } from '@/context/AuthContext'
 import { useGame } from '@/context/GameContext'
 import { useGameSheet } from '@/context/GameSheetContext'
@@ -30,16 +31,10 @@ import {
   coveragePercent,
 } from '@/lib/helpers'
 import { Target, Priority } from '@/lib/types'
-import { supabase } from '@/lib/supabase'
 import { SortKey, PriorityFilter, StatusFilter } from '@/lib/filterTypes'
 import { useFilterPersistence } from '@/hooks/useFilterPersistence'
 import { buildInteractionsCsv, shareOrDownloadCsv } from '@/lib/exportCsv'
 
-interface ConferenceInfo {
-  name: string
-  start_date: string
-  end_date: string
-}
 
 const LEFT_ACTION_WIDTH = 80  // "Add Note" button width
 const RIGHT_ACTION_WIDTH = 80 // "Met/Unmet" button width
@@ -221,15 +216,15 @@ export function ListView() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
   const { targets, loading, createInteraction, deleteInteraction } = useTargets(conferenceId)
+  const { conferences } = useConferences()
+  const conference = conferences.find(c => c.id === conferenceId) ?? null
   const { triggerMet } = useGame()
-  const [conference, setConference] = useState<ConferenceInfo | null>(null)
   const { setContext } = useGameSheet()
 
   const [swipedId, setSwipedId] = useState<string | null>(null)
 
   const [noteTarget, setNoteTarget] = useState<Target | null>(null)
   const [noteText, setNoteText] = useState('')
-  const [noteSaving, setNoteSaving] = useState(false)
   const [noteSaveError, setNoteSaveError] = useState<string | null>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -243,7 +238,7 @@ export function ListView() {
 
   const handleMarkMet = useCallback(async (target: Target) => {
     try {
-      const { pts } = await triggerMet(target.priority)
+      const { pts } = triggerMet(target.priority)
       await createInteraction(target.id, '', 'met', pts)
     } catch (err) {
       console.error('Failed to mark as met:', err)
@@ -271,34 +266,29 @@ export function ListView() {
 
   const handleSaveNote = useCallback(async () => {
     if (!noteTarget || !noteText.trim()) return
-    setNoteSaving(true)
+    const target = noteTarget
+    const text = noteText.trim()
+
+    // Close form immediately — optimistic update shows the note right away
+    setNoteTarget(null)
+    setNoteText('')
     setNoteSaveError(null)
+
     try {
-      await createInteraction(noteTarget.id, noteText.trim(), 'met', 0)
-      setNoteTarget(null)
-      setNoteText('')
+      await createInteraction(target.id, text, 'met', 0)
     } catch (err: any) {
+      // Optimistic note was reverted — reopen form so user can retry
       setNoteSaveError(err.message || 'Failed to save. Please try again.')
-    } finally {
-      setNoteSaving(false)
+      setNoteTarget(target)
+      setNoteText(text)
     }
   }, [noteTarget, noteText, createInteraction])
 
   useEffect(() => {
-    if (!conferenceId) return
-    supabase
-      .from('conference_conferences')
-      .select('name, start_date, end_date')
-      .eq('id', conferenceId)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          setConference(data as ConferenceInfo)
-          setContext({ conferenceId, conferenceName: (data as ConferenceInfo).name })
-        }
-      })
+    if (!conferenceId || !conference) return
+    setContext({ conferenceId, conferenceName: conference.name })
     return () => setContext(undefined)
-  }, [conferenceId, setContext])
+  }, [conferenceId, conference?.name, setContext])
 
   const {
     searchQuery,
@@ -652,10 +642,10 @@ export function ListView() {
             )}
             <button
               onClick={handleSaveNote}
-              disabled={!noteText.trim() || noteSaving}
+              disabled={!noteText.trim()}
               className="mt-3 w-full py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm disabled:opacity-40 active:bg-blue-700 transition-colors"
             >
-              {noteSaving ? 'Saving...' : 'Save Note'}
+              Save Note
             </button>
           </div>
         </div>

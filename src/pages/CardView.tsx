@@ -272,7 +272,6 @@ export function CardView() {
   const [floatingPts, setFloatingPts] = useState<number | null>(null)
   const [addingNote, setAddingNote] = useState(false)
   const [newNote, setNewNote] = useState('')
-  const [savingNew, setSavingNew] = useState(false)
   const [saveNoteError, setSaveNoteError] = useState<string | null>(null)
   const [confirmUnmet, setConfirmUnmet] = useState(false)
   const [markingUnmet, setMarkingUnmet] = useState(false)
@@ -297,7 +296,9 @@ export function CardView() {
     if (!targetId || !target) return
     setMarkingMet(true)
     try {
-      const { pts } = await triggerMet(target.priority)
+      // triggerMet is now synchronous (score DB write is fire-and-forget)
+      // so we can kick off createInteraction immediately after getting pts
+      const { pts } = triggerMet(target.priority)
       await createInteraction(targetId, '', 'met', pts)
       setFloatingPts(pts)
     } catch (err) {
@@ -309,23 +310,28 @@ export function CardView() {
 
   const handleSaveNewNote = async () => {
     if (!targetId || !target || !newNote.trim()) return
-    setSavingNew(true)
+    const text = newNote.trim()
+
+    let score = 0
+    if (!isMetByCurrentUser) {
+      const { pts } = triggerMet(target.priority)
+      score = pts
+      setFloatingPts(pts)
+    }
+
+    // Close form immediately — optimistic update in createInteraction shows the note right away
+    stopListening()
+    setNewNote('')
+    setAddingNote(false)
     setSaveNoteError(null)
+
     try {
-      let score = 0
-      if (!isMetByCurrentUser) {
-        const { pts } = await triggerMet(target.priority)
-        score = pts
-        setFloatingPts(pts)
-      }
-      await createInteraction(targetId, newNote.trim(), 'met', score)
-      stopListening()
-      setNewNote('')
-      setAddingNote(false)
+      await createInteraction(targetId, text, 'met', score)
     } catch (err: any) {
+      // Optimistic note was reverted — reopen form so user can retry
       setSaveNoteError(err.message || 'Failed to save. Please try again.')
-    } finally {
-      setSavingNew(false)
+      setNewNote(text)
+      setAddingNote(true)
     }
   }
 
@@ -644,17 +650,11 @@ export function CardView() {
               </div>
               <button
                 onClick={handleSaveNewNote}
-                disabled={savingNew || !newNote.trim()}
+                disabled={!newNote.trim()}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-[var(--text)] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors text-sm"
               >
-                {savingNew ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Save Note
-                  </>
-                )}
+                <Check className="w-4 h-4" />
+                Save Note
               </button>
               {saveNoteError && (
                 <p className="text-xs text-red-400 text-center">{saveNoteError}</p>
@@ -744,17 +744,11 @@ export function CardView() {
             </div>
             <button
               onClick={handleSaveNewNote}
-              disabled={savingNew || !newNote.trim()}
+              disabled={!newNote.trim()}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-[var(--text)] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-colors text-sm"
             >
-              {savingNew ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  Save Note
-                </>
-              )}
+              <Check className="w-4 h-4" />
+              Save Note
             </button>
             {saveNoteError && (
               <p className="text-xs text-red-400 text-center">{saveNoteError}</p>

@@ -51,36 +51,34 @@ export function useLeaderboard(conferenceId: string | undefined) {
         return
       }
 
-      // Conference-specific: aggregate interactions (fetch profiles separately
-      // to avoid relying on an indirect FK join that Supabase may not resolve)
-      const { data: interactions, error: intError } = await supabase
-        .from('conference_interactions')
-        .select(`
-          id,
-          user_id,
-          status,
-          score,
-          conference_targets!inner(conference_id, priority)
-        `)
-        .eq('conference_targets.conference_id', conferenceId)
-        .eq('status', 'met')
+      // Conference-specific: fetch interactions + all profiles in parallel to
+      // avoid two sequential round-trips.
+      const [
+        { data: interactions, error: intError },
+        { data: allProfiles, error: profError },
+      ] = await Promise.all([
+        supabase
+          .from('conference_interactions')
+          .select(`
+            id,
+            user_id,
+            status,
+            score,
+            conference_targets!inner(conference_id, priority)
+          `)
+          .eq('conference_targets.conference_id', conferenceId)
+          .eq('status', 'met'),
+        supabase
+          .from('conference_profiles')
+          .select('id, name, avatar_url, lifetime_score'),
+      ])
 
       if (intError) throw intError
+      if (profError) throw profError
 
       const rows = interactions || []
-      const userIds = [...new Set(rows.map(r => r.user_id))]
-
-      let profileMap: Record<string, { name: string; avatar_url?: string; lifetime_score: number }> = {}
-      if (userIds.length > 0) {
-        const { data: profiles, error: profError } = await supabase
-          .from('conference_profiles')
-          .select('id, name, avatar_url, lifetime_score')
-          .in('id', userIds)
-        if (profError) throw profError
-        for (const p of profiles || []) {
-          profileMap[p.id] = p
-        }
-      }
+      const profileMap: Record<string, { name: string; avatar_url?: string; lifetime_score: number }> = {}
+      for (const p of allProfiles || []) profileMap[p.id] = p
 
       const byUser: Record<string, {
         name: string
@@ -135,25 +133,27 @@ export function useLeaderboard(conferenceId: string | undefined) {
     fetchLeaderboard()
   }, [fetchLeaderboard])
 
-  // Realtime subscription
+  // Realtime subscription — debounced so the user's own write doesn't trigger
+  // an immediate re-fetch while optimistic state already reflects it.
   useEffect(() => {
     if (!conferenceId) return
 
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const handleEvent = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => fetchLeaderboard(), 1200)
+    }
+
     const channel = supabase
       .channel(`leaderboard-${conferenceId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'conference_interactions' },
-        () => { fetchLeaderboard() }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'conference_interactions' },
-        () => { fetchLeaderboard() }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conference_interactions' }, handleEvent)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conference_interactions' }, handleEvent)
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (timer) clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
   }, [conferenceId, fetchLeaderboard])
 
   return { entries, loading, refetch: fetchLeaderboard }

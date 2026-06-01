@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   Share2,
 } from 'lucide-react'
 import { useTargets } from '@/hooks/useTargets'
+import { useConferences } from '@/hooks/useConferences'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { useAuthContext } from '@/context/AuthContext'
 import { useGameSheet } from '@/context/GameSheetContext'
@@ -21,16 +22,9 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { StreakBanner } from '@/components/StreakBanner'
 import { coveragePercent, getInitials, getInitialsColorClass } from '@/lib/helpers'
 import { Target, Priority } from '@/lib/types'
-import { supabase } from '@/lib/supabase'
 import { SortKey, PriorityFilter, StatusFilter } from '@/lib/filterTypes'
 import { useFilterPersistence } from '@/hooks/useFilterPersistence'
 import { buildInteractionsCsv, shareOrDownloadCsv } from '@/lib/exportCsv'
-
-interface ConferenceInfo {
-  name: string
-  start_date: string
-  end_date: string
-}
 
 function TargetTile({ target, currentUserId, onClick }: {
   target: Target
@@ -127,24 +121,15 @@ export function GridView() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
   const { targets, loading, refetch } = useTargets(conferenceId)
-  const [conference, setConference] = useState<ConferenceInfo | null>(null)
+  const { conferences } = useConferences()
+  const conference = conferences.find(c => c.id === conferenceId) ?? null
   const { setContext } = useGameSheet()
 
   useEffect(() => {
-    if (!conferenceId) return
-    supabase
-      .from('conference_conferences')
-      .select('name, start_date, end_date')
-      .eq('id', conferenceId)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          setConference(data as ConferenceInfo)
-          setContext({ conferenceId, conferenceName: (data as ConferenceInfo).name })
-        }
-      })
+    if (!conferenceId || !conference) return
+    setContext({ conferenceId, conferenceName: conference.name })
     return () => setContext(undefined)
-  }, [conferenceId, setContext])
+  }, [conferenceId, conference?.name, setContext])
 
   const {
     searchQuery,
