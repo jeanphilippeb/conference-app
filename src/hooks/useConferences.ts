@@ -114,7 +114,8 @@ export function useConferences() {
     status?: Conference['status']
   }) => {
     const { data: userData } = await supabase.auth.getUser()
-    const { data: created, error } = await supabase
+
+    const insertQuery = supabase
       .from('conference_conferences')
       .insert({
         ...data,
@@ -123,17 +124,18 @@ export function useConferences() {
       })
       .select()
       .single()
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), 12000)
+    )
+    const { data: created, error } = await Promise.race([insertQuery, timeoutPromise]) as Awaited<typeof insertQuery>
 
     if (error) throw error
 
-    // Optimistic update: add to list immediately without triggering loading skeleton
+    // Optimistic update: new conference always has 0 targets/met, no refetch needed
     const newConf = { ...created, target_count: 0, met_count: 0 } as Conference
     const updated = [newConf, ...(conferencesCache || [])]
     conferencesCache = updated
     setConferences(updated)
-
-    // Background refresh for accurate counts (won't show skeleton since cache is set)
-    fetchConferences()
 
     return newConf
   }

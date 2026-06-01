@@ -24,7 +24,7 @@ interface GameContextValue {
   streakCount: number
   streakActive: boolean
   // actions
-  triggerMet: (priority: Priority) => Promise<{ pts: number }>
+  triggerMet: (priority: Priority) => { pts: number }
   triggerNote: (priority: Priority, pts: number) => void
   triggerFollowup: (priority: Priority, pts: number) => void
   showToast: (message: string, category: ToastCategory) => void
@@ -163,19 +163,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Use ref to avoid stale closure — always reads the latest score
-  const incrementLifetimeScore = useCallback(async (pts: number): Promise<{ oldScore: number; newScore: number }> => {
+  const incrementLifetimeScore = useCallback((pts: number): { oldScore: number; newScore: number } => {
     const oldScore = lifetimeScoreRef.current
     const newScore = oldScore + pts
     lifetimeScoreRef.current = newScore
     setLifetimeScore(newScore)
 
-    const { data } = await supabase.auth.getUser()
-    if (data.user) {
-      await supabase
-        .from('conference_profiles')
-        .update({ lifetime_score: newScore })
-        .eq('id', data.user.id)
-    }
+    // Fire-and-forget: state is updated optimistically above; DB write doesn't need to block the caller.
+    // getSession reads from localStorage — no network call needed just to get the userId.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase
+          .from('conference_profiles')
+          .update({ lifetime_score: newScore })
+          .eq('id', session.user.id)
+          .then(() => {})
+      }
+    })
+
     return { oldScore, newScore }
   }, []) // no dependency on lifetimeScore — uses ref instead
 
@@ -194,7 +199,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [showToast])
 
   // triggerMet no longer takes timestamps — firstOfDay is tracked globally in context
-  const triggerMet = useCallback(async (priority: Priority) => {
+  const triggerMet = useCallback((priority: Priority) => {
     const multiplier = updateStreakAndGetMultiplier()
 
     // True first-of-day: checks global meeting count for today, not per-target
@@ -207,7 +212,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     const pts = calculateScore('met', priority, bonuses)
-    const { oldScore, newScore } = await incrementLifetimeScore(pts)
+    const { oldScore, newScore } = incrementLifetimeScore(pts)
     checkLevelUp(oldScore, newScore)
 
     // Update today's count
